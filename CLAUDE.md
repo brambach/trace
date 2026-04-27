@@ -1,6 +1,8 @@
 # Trace
 
-A passive analytics layer for my Claude Code usage. Captures every session by tailing the local JSONL files Claude Code writes to disk, stores everything in SQLite, generates daily and weekly summaries, surfaces patterns in prompting and tool usage over time. Built for me first. Will likely open source on GitHub once v1 is stable. Possible product later, but that decision waits until I've used it for a month and the GitHub repo gets organic signal.
+A second brain for my AI-assisted coding. Trace tails the JSONL session files Claude Code writes to `~/.claude/projects/`, parses them into a queryable store, and surfaces what I built and where each project stands. Recall and project status are the centerpiece. Charts are ambient texture, not function. Built for me first. Will likely open source on GitHub once v1 is stable. Possible product later, but that decision waits until I've used it for a month and the GitHub repo gets organic signal.
+
+The full design is in `docs/superpowers/specs/2026-04-26-trace-design.md`. CLAUDE.md is the working agreement; the spec is the source of truth for scope and architecture.
 
 ## Tech stack
 
@@ -53,10 +55,10 @@ pnpm workspaces.
 
 Build:
 
-- File watcher writing to SQLite
-- Daily summary cron and markdown output
-- Dashboard with: messages per day, tokens per day, sessions per project, time-of-day heatmap, daily summary feed, tool call frequency
-- Basic prompt-pattern stats (average prompt length, most-used tool calls per project)
+- File watcher writing to SQLite (with FTS5 on message text)
+- Dashboard surfaces: today (editorial masthead, project ledger), search, projects portfolio, project detail, session detail
+- Daily and weekly summary cron with markdown output (Weekend 2)
+- Tool call extraction at parse time, surfaced Weekend 2
 
 Skip:
 
