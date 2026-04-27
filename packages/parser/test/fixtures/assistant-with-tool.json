@@ -1,0 +1,19 @@
+{
+  "type": "assistant",
+  "sessionId": "00000000-0000-0000-0000-000000000001",
+  "timestamp": "2026-04-26T12:00:02.000Z",
+  "uuid": "33333333-3333-3333-3333-333333333333",
+  "parentUuid": "22222222-2222-2222-2222-222222222222",
+  "message": {
+    "role": "assistant",
+    "content": [
+      { "type": "text", "text": "Reading now." },
+      {
+        "type": "tool_use",
+        "id": "toolu_abc",
+        "name": "Read",
+        "input": { "file_path": "/Users/example/Personal/projects/trace/src/parser.ts" }
+      }
+    ]
+  }
+}
