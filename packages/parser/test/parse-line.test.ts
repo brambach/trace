@@ -54,3 +54,21 @@ describe('parseLine — non-message line types', () => {
     expect(parseLine(JSON.stringify({ totally: 'unknown' }))).toBeNull();
   });
 });
+
+describe('parseLine — features wiring', () => {
+  it('user line with a file path and code block has matching features', () => {
+    const event = parseLine(fixture('user-line.json'));
+    if (!event || event.kind !== 'message') throw new Error('expected message');
+    expect(event.features.has_file_path).toBe(true);
+    expect(event.features.has_code_block).toBe(true);
+    expect(event.features.has_error_message).toBe(true);
+    expect(event.features.word_count).toBeGreaterThan(5);
+  });
+
+  it('assistant line with a tool_use yields one tool call', () => {
+    const event = parseLine(fixture('assistant-with-tool.json'));
+    if (!event || event.kind !== 'message') throw new Error('expected message');
+    expect(event.toolCalls).toHaveLength(1);
+    expect(event.toolCalls[0]?.name).toBe('Read');
+  });
+});
