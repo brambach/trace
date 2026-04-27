@@ -13,7 +13,7 @@ export function getDb(path: string = TRACE_DB_PATH): TraceDb {
   const sqlite = new Database(path);
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('foreign_keys = ON');
-  const db = drizzle(sqlite, { schema }) as TraceDb;
+  const db = drizzle(sqlite, { schema }) as unknown as TraceDb;
   db.sqlite = sqlite;
   migrate(db);
   return db;
