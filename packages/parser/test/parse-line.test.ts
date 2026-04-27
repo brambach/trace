@@ -29,3 +29,28 @@ describe('parseLine', () => {
     expect(parseLine('not json')).toBeNull();
   });
 });
+
+describe('parseLine — non-message line types', () => {
+  it('extracts ai-title', () => {
+    const event = parseLine(fixture('ai-title.json'));
+    if (!event || event.kind !== 'ai-title') throw new Error('expected ai-title');
+    expect(event.aiTitle).toBe('Fix null timestamp parsing');
+    expect(event.sessionId).toBe('00000000-0000-0000-0000-000000000001');
+  });
+
+  it('classifies attachment as noise (v1)', () => {
+    const event = parseLine(fixture('attachment.json'));
+    if (!event) throw new Error('expected event');
+    expect(event.kind).toBe('noise');
+  });
+
+  it('classifies queue-operation as noise', () => {
+    const event = parseLine(fixture('queue-operation.json'));
+    if (!event) throw new Error('expected event');
+    expect(event.kind).toBe('noise');
+  });
+
+  it('returns null for an unknown line shape', () => {
+    expect(parseLine(JSON.stringify({ totally: 'unknown' }))).toBeNull();
+  });
+});
