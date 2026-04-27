@@ -11,18 +11,20 @@ The original framing was "passive analytics layer." That was the wrong centerpie
 
 ## Goal
 
-When I open Trace, three things should happen in order:
+When I open Trace, four things should happen in order:
 
 1. I see a one-paragraph picture of what I worked on today, by project.
 2. I see the live status of every project I'm building with Claude: last touched, current focus, open threads.
 3. I can search the full text of every session I've ever had and click straight to the moment I want.
+4. I can see how my prompting is changing over time and which sessions drifted.
 
-That's the product.
+That's the product. Three pillars: **Recall**, **Portfolio**, **Patterns**.
 
 ## Non-goals
 
 - Multi-user, accounts, hosted deploy. Single user, single machine, no auth.
-- Real-time session-quality scoring. That's the v2 ("coach") idea, held in reserve.
+- Real-time session-quality scoring. v1 Patterns is retrospective and deterministic. Live coaching is the v2 ("coach") idea, held in reserve.
+- LLM-judged quality scores in v1. Patterns counts deterministic features (length, file paths, retry phrases). Coach-flavored narrative comes from the summarizer (Weekend 2) and is clearly labeled as AI-generated, not a confident causal claim.
 - Charts as a centerpiece of any view. Charts are ambient texture, not function.
 - Any UI that asks me to type into Trace. Trace reads from disk. It never asks me to log anything.
 - Public landing page, pricing, sharing, social.
@@ -77,14 +79,25 @@ sessions
   id (uuid, PK), cwd, project_name, git_branch,
   ai_title, first_user_message,
   started_at, ended_at,
-  message_count, tool_call_count,
-  ended_without_assistant_reply (bool, derived)
+  message_count, turn_count, tool_call_count,
+  ended_without_assistant_reply (bool, derived),
+  -- Patterns features (computed when session closes)
+  assistant_question_count (int),
+  first_response_was_tool (bool),
+  retry_signal_count (int)
 
 messages
   id (uuid, PK), session_id (FK), role,
   content (raw JSON), content_text (flattened plain text),
   cwd, git_branch, timestamp,
-  token_count_estimate
+  token_count_estimate,
+  -- Patterns features (computed at insert)
+  word_count (int),
+  has_file_path (bool),
+  has_code_block (bool),
+  has_error_message (bool),
+  is_interrogative (bool),
+  retry_signal (bool)
 
 messages_fts (FTS5 virtual table)
   content_text, session_id, message_id, timestamp
@@ -111,10 +124,11 @@ Notes:
 - `tool_calls` are extracted from `assistant.message.content` blocks at parse time. Empty in the Weekend 1 slice; the table exists.
 - `summaries.project_path` is nullable. Daily and weekly summaries leave it null. Per-project rollups set it. One table for all three.
 - `ended_without_assistant_reply` is a bool we set when a session's last meaningful event is a user message. Cheap signal for "this session was interrupted."
+- **Patterns features** are computed deterministically by the parser. `has_file_path` matches `/[\w./-]+\.[a-z]{1,5}\b/` plus a few path-shape heuristics; `has_code_block` matches triple-backtick fences; `has_error_message` matches common error prefixes (`Error:`, `TypeError:`, stack-trace shapes); `is_interrogative` is "ends in `?` and lacks an imperative verb in the first clause"; `retry_signal` matches a small phrase list (`no, not that`, `actually,`, `try again`, `that's wrong`, `no, do`). These are heuristics, not judgments. We surface counts, not scores.
 
 ## Dashboard surfaces
 
-The dashboard has five surfaces in v1, each scaled to the editorial system locked during brainstorming.
+The dashboard has six surfaces in v1, each scaled to the editorial system locked during brainstorming.
 
 ### 1. Today (home, `/`)
 
@@ -162,7 +176,22 @@ A masthead for one project. Composition:
 - Most-touched files (Weekend 2, derived from `tool_calls.arguments_json` for Edit/Write).
 - Per-project weekly summary (Weekend 2).
 
-### 5. Session detail (`/sessions/[id]`)
+### 5. Patterns (`/patterns`)
+
+The third pillar. Retrospective view of how my prompting is changing. All metrics are deterministic, computed at parse time. No LLM scoring in v1.
+
+Sections, in order:
+
+- **Headline + deck**: a plain-English read of the period (`Your prompts are getting longer and more specific. 26% include a file path now, up from 11% two weeks ago.`). In v1 this is templated from the deltas. Weekend 2, the summarizer rewrites it as proper prose with the same numbers.
+- **Prompt length, distributed**: histogram of user prompts over the last 14 days, accent band over the median, with three callouts (median word count, shortest-prompt count, share under 10 words).
+- **Prompt anatomy**: six bars showing `% of prompts containing` each signal — file path, code block, error message, imperative, question with no context, multi-ask. Each shows current %, delta over 14 days, and a one-line outcome correlation pulled from the data ("prompts that mention a path get a 1-shot fix 71% of the time"). Outcomes are aggregated, not LLM-judged.
+- **One-shot success**: % of sessions completed in ≤ 3 turns, trended over the period.
+- **Where you redirect Claude**: top retry phrases by count, with sessions touched. Beside it, a coach-flavored insight box: italic prose, accent left rule, footer caveat (`Heuristic · derived · not a confident causal claim`).
+- **Sessions that drifted**: clickable rows showing sessions flagged as likely doom loops. Flag heuristics: `DRIFT` (≥ 5 retry signals + repeated edits to same file), `VAGUE` (avg user-prompt length under 20 words and ≥ 4 turns), `SHIFTING` (≥ 4 `actually,` redirects). Click → session detail page.
+
+The integrity contract for this surface: we count features, we don't score quality. The footer carries the line `All metrics derived from local data — no scoring by AI` so it never reads as fake authority.
+
+### 6. Session detail (`/sessions/[id]`)
 
 The reading view. Editorial first.
 
@@ -195,9 +224,10 @@ In:
 - `packages/parser` with pure functions: `parseLine(jsonStr) → ParsedEvent | null`. Tested.
 - `packages/db` with Drizzle schema, the migration, the FTS5 trigger setup, the SQLite path constant.
 - `apps/watcher`: chokidar watcher, offset tracking, idempotent inserts.
-- `apps/dashboard`: home (editorial masthead, project ledger, demoted stat row, demoted chart, search input), `/search` results page, `/projects` portfolio page, `/projects/[slug]` project detail (timeline only), `/sessions/[id]` (raw text only).
+- `apps/dashboard`: home (editorial masthead, project ledger, demoted stat row, demoted chart, search input), `/search` results page, `/projects` portfolio page, `/projects/[slug]` project detail (timeline only), `/patterns` (length distribution, prompt anatomy, one-shot rate, retry phrases, drift list — all deterministic), `/sessions/[id]` (raw text only).
 - Editorial type, palette, and entrance animation applied across all surfaces.
 - Tool call rows: parser extracts them, watcher writes them. Surface comes Weekend 2.
+- Patterns features: parser computes per-message booleans (`has_file_path`, `has_code_block`, `has_error_message`, `is_interrogative`, `retry_signal`, `word_count`); watcher updates per-session aggregates (`turn_count`, `assistant_question_count`, `first_response_was_tool`, `retry_signal_count`) when a session closes (or rolls forward on each insert).
 
 Out (Weekend 2 or later):
 
@@ -211,15 +241,16 @@ Out (Weekend 2 or later):
 
 ### Definition of done for the slice
 
-I run `pnpm dev` in two panes (watcher + dashboard) and use Claude Code in a third window. Within seconds, my localhost dashboard updates: today's masthead reflects today's most active session, the project ledger lists my real projects, the search bar finds a phrase I just typed in another window, and the projects page shows every active project with a real "last touched" timestamp.
+I run `pnpm dev` in two panes (watcher + dashboard) and use Claude Code in a third window. Within seconds, my localhost dashboard updates: today's masthead reflects today's most active session, the project ledger lists my real projects, the search bar finds a phrase I just typed in another window, the projects page shows every active project with a real "last touched" timestamp, and `/patterns` shows real distributions and a real one-shot rate computed from my actual prompts (not seeded data).
 
 ## Future considerations
 
-- **Coach view.** Per-session quality scoring. "First 50 minutes productive, last 40 in a doom loop." Pattern detection across sessions. The hardest, headiest version of Trace and the one that earns a real product moat. Held until v1 has been used daily for a month.
-- **Cost surfacing.** Once the Anthropic API exposes per-session cost cleanly, surface dollars on the project portfolio and weekly summary.
+- **Coach view (v2).** Real-time and per-session LLM-judged quality scoring. "First 50 minutes productive, last 40 in a doom loop." Personalized advice grounded in your specific patterns over a month of v1 use. The hardest, headiest version of Trace and the one that earns a real product moat. Held until v1 has been used daily for a month and we know which deterministic signals carry weight.
+- **Cost surfacing.** Once the Anthropic API exposes per-session cost cleanly, surface dollars on the project portfolio, the weekly summary, and the Patterns page.
 - **Skill / hook attribution.** Which superpowers skills loaded into a session, did they help, and how often. Useful but speculative until v1 ships.
 - **Session-as-story polish.** The full marginalia treatment with sticky outline, prompt-anchor navigation, and tool-call drill-down.
-- **Time-of-day heatmap.** Useful but not centerpiece; lives on a "Patterns" page if it ever earns one.
+- **Time-of-day heatmap.** Lives on Patterns once we know if the rhythm signal is interesting.
+- **Patterns LLM narrative.** Weekend 2: summarizer rewrites the Patterns page headline and deck as proper prose using the same numbers, with an explicit AI-generated label.
 
 ## Open questions
 
@@ -234,11 +265,13 @@ None block Weekend 1. Flagged for later:
 - **JSONL format changes silently.** Mitigation: parser is pure-functional and unit-tested against fixtures captured today. New unknown line types log and drop, never crash.
 - **FTS5 + Drizzle ergonomics.** Drizzle doesn't have first-class FTS5 helpers. Mitigation: write the FTS5 setup in raw SQL inside the migration, query through Drizzle's `sql\`...\`` helper.
 - **`content_text` rendering loses fidelity.** Code blocks, attachments, and embedded JSON. Mitigation: render is best-effort for v1, and `content` raw JSON is always available for the session detail view's eventual marginalia treatment.
+- **Patterns heuristics give false confidence.** A 71% one-shot rate sounds rigorous when it's actually counting cheap features. Mitigation: surface raw counts alongside percentages, label outcome correlations as heuristics, footer the page with `All metrics derived from local data — no scoring by AI`, never rank prompts as good or bad. The Patterns page is read-only data; advice waits for v2.
 
 ## Decisions captured
 
 - Vertical slice over foundation-first or data-first.
 - Editorial aesthetic over terminal, brutalist, or soft-minimal.
-- Second brain leading, project portfolio structuring, coach in reserve.
+- Three pillars in v1: Recall (search + session detail), Portfolio (today + projects), Patterns (deterministic features).
+- LLM-judged quality scoring deferred to v2. v1 Patterns counts features, doesn't score.
 - One repo, one machine, one user. No deploy.
 - Charts demoted from centerpiece on every surface.

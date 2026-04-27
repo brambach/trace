@@ -56,9 +56,14 @@ pnpm workspaces.
 Build:
 
 - File watcher writing to SQLite (with FTS5 on message text)
-- Dashboard surfaces: today (editorial masthead, project ledger), search, projects portfolio, project detail, session detail
+- Three pillars in the dashboard:
+  - Recall: search across every session, session detail reading view
+  - Portfolio: today (masthead + project ledger), projects (portfolio grid), project detail
+  - Patterns: deterministic prompt-feature surface (length distribution, anatomy, one-shot rate, retry phrases, drifted sessions)
 - Daily and weekly summary cron with markdown output (Weekend 2)
 - Tool call extraction at parse time, surfaced Weekend 2
+
+Patterns counts features, never scores quality. LLM-judged coaching is a v2 idea ("coach"), held until v1 has been used daily for a month.
 
 Skip:
 
