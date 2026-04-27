@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { parseLine } from '@trace/parser';
 import type { TraceDb } from '@trace/db';
-import { insertEvent } from './inserts.js';
+import { insertEvent, recomputeSessionAggregates } from './inserts.js';
 
 export function processFile(db: TraceDb, filePath: string): void {
   let size: number;
@@ -32,9 +32,15 @@ export function processFile(db: TraceDb, filePath: string): void {
   const lines = text.slice(0, consumeUpTo).split('\n').filter((l) => l !== '');
 
   const txn = db.sqlite.transaction(() => {
+    const touchedSessions = new Set<string>();
     for (const line of lines) {
       const ev = parseLine(line);
-      if (ev) insertEvent(db, filePath, ev);
+      if (!ev) continue;
+      const sessionId = insertEvent(db, filePath, ev);
+      if (sessionId) touchedSessions.add(sessionId);
+    }
+    for (const sessionId of touchedSessions) {
+      recomputeSessionAggregates(db, sessionId);
     }
     db.sqlite
       .prepare(

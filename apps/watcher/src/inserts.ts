@@ -2,17 +2,22 @@ import type { TraceDb } from '@trace/db';
 import type { ParsedEvent } from '@trace/shared';
 import { basename } from 'node:path';
 
+// Returns the session id touched by this event, or null for noise / unknown.
+// recomputeSessionAggregates is intentionally NOT called here. Per-event
+// recompute is O(session size) and turns initial scans into O(n^2). The
+// caller (process-file) collects touched session ids and recomputes once
+// at the end of each file's transaction.
 export function insertEvent(
   db: TraceDb,
   filePath: string,
   ev: ParsedEvent,
-): void {
-  if (ev.kind === 'noise') return;
+): string | null {
+  if (ev.kind === 'noise') return null;
   if (ev.kind === 'ai-title') {
     db.sqlite
       .prepare(`UPDATE sessions SET ai_title = ? WHERE id = ?`)
       .run(ev.aiTitle, ev.sessionId);
-    return;
+    return ev.sessionId;
   }
 
   const projectName =
@@ -61,7 +66,7 @@ export function insertEvent(
       .run(tc.id, ev.sessionId, ev.uuid, tc.name, tc.arguments_json, ev.timestamp);
   }
 
-  recomputeSessionAggregates(db, ev.sessionId);
+  return ev.sessionId;
 }
 
 function decodeProjectFromFilePath(filePath: string): string {
@@ -90,7 +95,7 @@ function ensureSession(
     .run(id, cwd, projectName, gitBranch, timestamp, timestamp);
 }
 
-function recomputeSessionAggregates(db: TraceDb, sessionId: string): void {
+export function recomputeSessionAggregates(db: TraceDb, sessionId: string): void {
   db.sqlite
     .prepare(
       `UPDATE sessions SET
