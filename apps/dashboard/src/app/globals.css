@@ -1,3 +1,80 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --paper: #f6f3ec;
+  --ink: #1a1a1a;
+  --dim: #8a7e63;
+  --accent: #c89b7b;
+  --rule: rgba(26, 26, 26, 0.18);
+  --quiet: rgba(26, 26, 26, 0.06);
+  --page: #ddd6c7;
+  --good: #4a7a3f;
+  --bad: #a05a3f;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+html, body { background: var(--page); }
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.serif-numerals { font-feature-settings: "lnum" 1, "tnum" 1; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes drawRule { to { transform: scaleX(1); } }
+@keyframes breathe {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50%      { opacity: 1;   transform: scale(1.1); }
+}
+@keyframes breatheToday {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.18); }
+}
+@keyframes drawLine { to { stroke-dashoffset: 0; } }
+@keyframes fadeIn { to { opacity: 1; } }
+
+.reveal { opacity: 0; transform: translateY(8px); animation: rise 720ms var(--ease) forwards; }
+.r1 { animation-delay: 40ms; }
+.r2 { animation-delay: 200ms; }
+.r3 { animation-delay: 380ms; }
+.r4 { animation-delay: 560ms; }
+.r5 { animation-delay: 760ms; }
+.r6 { animation-delay: 960ms; }
+.r7 { animation-delay: 1160ms; }
+
+.rule {
+  position: relative; height: 1px; background: transparent; overflow: hidden;
+}
+.rule::after {
+  content: ''; position: absolute; inset: 0; background: var(--ink); opacity: 0.18;
+  transform-origin: left center; transform: scaleX(0);
+  animation: drawRule 700ms var(--ease) 320ms forwards;
+}
+
+.breathe { animation: breathe 1.6s ease-in-out infinite; }
+.breathe-today { animation: breatheToday 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .rule::after { animation: none !important; transform: scaleX(1) !important; }
+  .breathe, .breathe-today { animation: none !important; }
+}
+
+.eyebrow {
+  font-family: var(--font-mono, 'SF Mono', 'IBM Plex Mono', ui-monospace, monospace);
+  font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim);
+}
+.section-label { @apply eyebrow; }
+.headline {
+  font-size: 38px; line-height: 1.08; letter-spacing: -0.012em;
+  font-family: 'Iowan Old Style', 'Apple Garamond', 'Hoefler Text', Georgia, serif;
+  font-weight: 400;
+}
+.deck { font-style: italic; font-size: 15.5px; color: #4a4a4a; line-height: 1.45; }
