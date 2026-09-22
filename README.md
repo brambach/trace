@@ -39,4 +39,4 @@ The full v1 spec lives at [`docs/superpowers/specs/2026-04-26-trace-design.md`](
 
 ## License
 
-MIT (planned, once made public).
+MIT. See [LICENSE](LICENSE).
