@@ -81,6 +81,9 @@ importers:
 
   apps/watcher:
     dependencies:
+      '@trace/coach':
+        specifier: workspace:*
+        version: link:../../packages/coach
       '@trace/db':
         specifier: workspace:*
         version: link:../../packages/db
