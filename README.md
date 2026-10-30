@@ -9,7 +9,7 @@ I tell my coding agent the same things over and over. Use pnpm. Run the tests wi
 
 Trace reads the session files Claude Code and Codex write to disk, finds the corrections you keep repeating, and drafts the line for your CLAUDE.md that would have saved you the trouble. You apply it in one click, as a local edit or a pull request. Then Trace watches whether you ever have to say it again.
 
-**[Try the demo →](https://trace-rust-three.vercel.app)** It runs on made-up sessions, and nothing you click is saved.
+**[Try the demo →](https://trace.brycerambach.com)** It runs on made-up sessions, and nothing you click is saved.
 
 ## What it does
 
