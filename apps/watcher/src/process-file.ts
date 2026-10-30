@@ -1,5 +1,6 @@
 import { readFileSync, statSync } from 'node:fs';
-import { parseLine } from '@trace/parser';
+import { parseLine, parseCodexLine, codexSessionIdFromPath } from '@trace/parser';
+import type { ParsedEvent } from '@trace/shared';
 import type { TraceDb } from '@trace/db';
 import { insertEvent, recomputeSessionAggregates } from './inserts.js';
 
@@ -29,12 +30,23 @@ export function processFile(db: TraceDb, filePath: string): void {
   const consumeUpTo = lastNewline === -1 ? -1 : lastNewline;
   if (consumeUpTo === -1) return;
 
-  const lines = text.slice(0, consumeUpTo).split('\n').filter((l) => l !== '');
+  const codexSession = codexSessionIdFromPath(filePath);
+  const parse = (line: string, byteOffset: number): ParsedEvent | null =>
+    codexSession
+      ? parseCodexLine(line, { sessionId: codexSession, lineId: `${codexSession}:${byteOffset}` })
+      : parseLine(line);
+
+  const lines: { text: string; offset: number }[] = [];
+  let offset = start;
+  for (const l of text.slice(0, consumeUpTo).split('\n')) {
+    if (l !== '') lines.push({ text: l, offset });
+    offset += Buffer.byteLength(l, 'utf8') + 1;
+  }
 
   const txn = db.sqlite.transaction(() => {
     const touchedSessions = new Set<string>();
     for (const line of lines) {
-      const ev = parseLine(line);
+      const ev = parse(line.text, line.offset);
       if (!ev) continue;
       const sessionId = insertEvent(db, filePath, ev);
       if (sessionId) touchedSessions.add(sessionId);

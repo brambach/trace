@@ -28,6 +28,7 @@ export const UserLineSchema = z
   .object({
     type: z.literal('user'),
     sessionId: z.string(),
+    isMeta: z.boolean().optional(),
     timestamp: z.string(),
     uuid: z.string(),
     parentUuid: z.string().nullable().optional(),

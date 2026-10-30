@@ -1,5 +1,5 @@
 import type { TraceDb } from '@trace/db';
-import type { ParsedEvent } from '@trace/shared';
+import type { Agent, ParsedEvent } from '@trace/shared';
 import { basename } from 'node:path';
 
 // Returns the session id touched by this event, or null for noise / unknown.
@@ -13,6 +13,11 @@ export function insertEvent(
   ev: ParsedEvent,
 ): string | null {
   if (ev.kind === 'noise') return null;
+  if (ev.kind === 'session-meta') {
+    const projectName = ev.cwd !== '' ? basename(ev.cwd) : 'unknown';
+    ensureSession(db, ev.sessionId, ev.cwd, projectName, ev.gitBranch, ev.timestamp, ev.agent);
+    return ev.sessionId;
+  }
   if (ev.kind === 'ai-title') {
     db.sqlite
       .prepare(`UPDATE sessions SET ai_title = ? WHERE id = ?`)
@@ -23,18 +28,20 @@ export function insertEvent(
   const projectName =
     ev.cwd && ev.cwd !== ''
       ? basename(ev.cwd)
-      : decodeProjectFromFilePath(filePath);
+      : ev.agent === 'codex'
+        ? 'unknown'
+        : decodeProjectFromFilePath(filePath);
   const cwd = ev.cwd ?? '';
-  ensureSession(db, ev.sessionId, cwd, projectName, ev.gitBranch ?? null, ev.timestamp);
+  ensureSession(db, ev.sessionId, cwd, projectName, ev.gitBranch ?? null, ev.timestamp, ev.agent);
 
   db.sqlite
     .prepare(
       `INSERT INTO messages (
          id, session_id, role, content, content_text, cwd, git_branch, timestamp, token_count_estimate,
-         word_count, has_file_path, has_code_block, has_error_message, is_interrogative, retry_signal
+         word_count, has_file_path, has_code_block, has_error_message, is_interrogative, retry_signal, kind
        ) VALUES (
          ?, ?, ?, ?, ?, ?, ?, ?, ?,
-         ?, ?, ?, ?, ?, ?
+         ?, ?, ?, ?, ?, ?, ?
        )
        ON CONFLICT(id) DO NOTHING`,
     )
@@ -54,6 +61,7 @@ export function insertEvent(
       bool(ev.features.has_error_message),
       bool(ev.features.is_interrogative),
       bool(ev.features.retry_signal),
+      ev.messageKind,
     );
 
   for (const tc of ev.toolCalls) {
@@ -82,17 +90,21 @@ function ensureSession(
   projectName: string,
   gitBranch: string | null,
   timestamp: string,
+  agent: Agent,
 ): void {
+  // Codex only states the cwd once, in its first line, so a later event with
+  // no cwd must not blank it out.
   db.sqlite
     .prepare(
-      `INSERT INTO sessions (id, cwd, project_name, git_branch, started_at, ended_at)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO sessions (id, cwd, project_name, git_branch, started_at, ended_at, agent)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-         cwd = excluded.cwd,
-         project_name = excluded.project_name,
-         git_branch = COALESCE(excluded.git_branch, sessions.git_branch)`,
+         cwd = CASE WHEN excluded.cwd = '' THEN sessions.cwd ELSE excluded.cwd END,
+         project_name = CASE WHEN excluded.cwd = '' THEN sessions.project_name ELSE excluded.project_name END,
+         git_branch = COALESCE(excluded.git_branch, sessions.git_branch),
+         agent = excluded.agent`,
     )
-    .run(id, cwd, projectName, gitBranch, timestamp, timestamp);
+    .run(id, cwd, projectName, gitBranch, timestamp, timestamp, agent);
 }
 
 export function recomputeSessionAggregates(db: TraceDb, sessionId: string): void {
@@ -100,20 +112,20 @@ export function recomputeSessionAggregates(db: TraceDb, sessionId: string): void
     .prepare(
       `UPDATE sessions SET
          message_count = (SELECT COUNT(*) FROM messages WHERE session_id = sessions.id),
-         turn_count    = (SELECT COUNT(*) FROM messages WHERE session_id = sessions.id AND role = 'user'),
+         turn_count    = (SELECT COUNT(*) FROM messages WHERE session_id = sessions.id AND kind IN ('prompt','rejection')),
          tool_call_count = (SELECT COUNT(*) FROM tool_calls WHERE session_id = sessions.id),
-         retry_signal_count = (SELECT COUNT(*) FROM messages WHERE session_id = sessions.id AND role = 'user' AND retry_signal = 1),
+         retry_signal_count = (SELECT COUNT(*) FROM messages WHERE session_id = sessions.id AND kind IN ('prompt','rejection') AND retry_signal = 1),
          assistant_question_count = (SELECT COUNT(*) FROM messages WHERE session_id = sessions.id AND role = 'assistant' AND content_text LIKE '%?%'),
-         ended_at = (SELECT MAX(timestamp) FROM messages WHERE session_id = sessions.id),
-         started_at = (SELECT MIN(timestamp) FROM messages WHERE session_id = sessions.id),
+         ended_at = COALESCE((SELECT MAX(timestamp) FROM messages WHERE session_id = sessions.id), sessions.ended_at),
+         started_at = COALESCE((SELECT MIN(timestamp) FROM messages WHERE session_id = sessions.id), sessions.started_at),
          first_user_message = (
            SELECT content_text FROM messages
-           WHERE session_id = sessions.id AND role = 'user'
+           WHERE session_id = sessions.id AND kind = 'prompt'
            ORDER BY timestamp ASC LIMIT 1
          ),
          ended_without_assistant_reply = (
-           SELECT CASE WHEN role = 'user' THEN 1 ELSE 0 END
-           FROM messages WHERE session_id = sessions.id
+           SELECT CASE WHEN kind = 'prompt' THEN 1 ELSE 0 END
+           FROM messages WHERE session_id = sessions.id AND kind IN ('prompt','reply')
            ORDER BY timestamp DESC LIMIT 1
          ),
          first_response_was_tool = (

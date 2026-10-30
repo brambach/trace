@@ -1,7 +1,5 @@
 -- 0000_init.sql
 
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
