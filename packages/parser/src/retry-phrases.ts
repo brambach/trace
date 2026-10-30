@@ -16,6 +16,10 @@ export const RETRY_PHRASE_PATTERNS: RegExp[] = [
   /\binstead\b.*\bnot\b|\bnot\b.*\binstead\b/iu,
   /^\s*(?:don'?t|do\s+not|never)\s+\w+/iu,
   /\bagain[.!]*\s*$/iu,
+  /^\s*again\b/iu,
+  /\binstead\b/iu,
+  /\bwe\s+(?:use|don'?t\s+use)\b/iu,
+  /^\s*stop\s+\w+ing\b/iu,
 ];
 
 export function matchesRetry(text: string): boolean {
