@@ -106,6 +106,20 @@ describe('coach', () => {
   });
 });
 
+describe('one correction, two instructions', () => {
+  it('becomes one fix that keeps both', () => {
+    const mk = (id: string, text: string) =>
+      session(id, '/x/blog', [{ you: 'add pull quotes' }, { tools: [edit('src/styles/pullquote.css')] }, { you: text }]);
+    const { fixes } = coach([
+      mk('a', "don't write new markdown styles. use the Prose component in src/components/Prose.astro"),
+      mk('b', 'no, use the Prose component. never write new markdown styles'),
+    ]);
+    expect(fixes).toHaveLength(1);
+    expect(fixes[0]!.times).toBe(2);
+    expect(fixes[0]!.line).toBe("Don't write new markdown styles. Use the Prose component.");
+  });
+});
+
 describe('cleanDirective', () => {
   it('strips lead-ins and trailing nags', () => {
     expect(cleanDirective('no, I said never use default exports again!')).toBe('Never use default exports.');

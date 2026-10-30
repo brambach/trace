@@ -1,20 +1,35 @@
+import type { Metadata, Viewport } from 'next';
+import { Hanken_Grotesk, IBM_Plex_Mono, Instrument_Serif } from 'next/font/google';
 import './globals.css';
 import { AppHeader } from '@/components/AppHeader';
+import { DemoBar } from '@/components/DemoBar';
+import { isDemo } from '@/lib/mode';
 
-export const metadata = { title: 'Trace', description: 'A second brain for AI-assisted coding' };
+const display = Instrument_Serif({ subsets: ['latin'], weight: '400', style: ['normal', 'italic'], variable: '--font-display' });
+const sans = Hanken_Grotesk({ subsets: ['latin'], variable: '--font-sans' });
+const mono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-mono' });
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export const metadata: Metadata = {
+  title: { default: 'Trace', template: '%s · Trace' },
+  description: 'Trace reads your Claude Code and Codex sessions, marks every time you corrected the agent, and writes the fix into CLAUDE.md so you stop repeating yourself.',
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ebe7de' },
+    { media: '(prefers-color-scheme: dark)', color: '#0e0d0c' },
+  ],
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-page font-serif text-ink">
-        <div className="mx-auto max-w-[880px] px-6 py-8">
-          <div className="overflow-hidden rounded-sm bg-paper shadow-[0_1px_1px_rgba(0,0,0,0.04),0_24px_48px_-24px_rgba(0,0,0,0.18)]">
-            <AppHeader active={null} />
-            <div className="px-16 py-10">{children}</div>
+    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+      <body className="min-h-screen bg-ground font-sans text-[15px] leading-[1.5] text-ink">
+        <div className="mx-auto max-w-[980px] sm:px-6 sm:py-8">
+          <div className="min-h-screen overflow-hidden bg-paper shadow-lift sm:min-h-0 sm:rounded-[14px]">
+            {isDemo && <DemoBar />}
+            <AppHeader />
+            <main className="px-5 pb-16 pt-8 sm:px-14 sm:pb-20 sm:pt-12">{children}</main>
           </div>
         </div>
       </body>

@@ -43,7 +43,10 @@ export function coach(sessions: SessionTimeline[], opts: CoachOptions = {}): Coa
     const first = group[0]!.rule;
     const key = first.kind === 'your-words' ? `say:${hash(group.map((h) => h.rule.key).sort()[0]!)}` : first.key;
     const id = hash(`${key}@${target.path}`);
-    const sorted = [...group].sort((a, b) => a.correction.timestamp.localeCompare(b.correction.timestamp));
+    const seen = new Set<string>();
+    const sorted = [...group]
+      .sort((a, b) => a.correction.timestamp.localeCompare(b.correction.timestamp))
+      .filter((h) => !seen.has(h.correction.messageId) && seen.add(h.correction.messageId));
     const evidence: Evidence[] = sorted.map(({ correction: c, rule }) => ({
       sessionId: c.sessionId,
       messageId: c.messageId,
@@ -53,7 +56,7 @@ export function coach(sessions: SessionTimeline[], opts: CoachOptions = {}): Coa
       did: rule.did,
       via: c.via,
     }));
-    const { line, habit } = compose(group);
+    const { line, habit, said } = compose(group);
 
     fixes.push({
       id,
@@ -61,7 +64,8 @@ export function coach(sessions: SessionTimeline[], opts: CoachOptions = {}): Coa
       key,
       line,
       habit,
-      times: group.length,
+      said,
+      times: sorted.length,
       sessions: sessionIds.size,
       projects: [...new Set(group.map((h) => h.correction.project_name))],
       target,
@@ -110,7 +114,20 @@ function groupHits(hits: Hit[]): Hit[][] {
     byRoot.set(r, [...(byRoot.get(r) ?? []), h]);
   });
 
-  return [...exact.values(), ...byRoot.values()];
+  return [...exact.values(), ...mergeSameMoments([...byRoot.values()])];
+}
+
+// "no, use the Prose component. never write new markdown styles" said twice
+// gives two your-words groups built from the same corrections. They're one
+// habit, so they become one fix.
+function mergeSameMoments(groups: Hit[][]): Hit[][] {
+  const key = (g: Hit[]) => [...new Set(g.map((h) => h.correction.messageId))].sort().join('|');
+  const byMoments = new Map<string, Hit[]>();
+  for (const g of groups) {
+    const k = key(g);
+    byMoments.set(k, [...(byMoments.get(k) ?? []), ...g]);
+  }
+  return [...byMoments.values()];
 }
 
 function targetFor(group: Hit[], globalPath: string): FixTarget {
@@ -122,6 +139,22 @@ function targetFor(group: Hit[], globalPath: string): FixTarget {
   return { scope: 'global', cwd: null, path: globalPath };
 }
 
+// Within one fix, instructions that are the same words said differently
+// collapse to one; distinct instructions stay side by side.
+function mergeSimilar(entries: [string, string[]][]): string[][] {
+  const out: { tokens: string[]; lines: string[] }[] = [];
+  for (const [key, lines] of entries) {
+    const tokens = key.split(':')[2]!.split(' ');
+    const hit = out.find((o) => {
+      const { score, shared } = jaccard(o.tokens, tokens);
+      return score >= 0.5 && shared >= 2;
+    });
+    if (hit) hit.lines.push(...lines);
+    else out.push({ tokens, lines: [...lines] });
+  }
+  return out.sort((a, b) => b.lines.length - a.lines.length).map((o) => o.lines);
+}
+
 function mostCommon(values: string[]): string {
   const counts = new Map<string, number>();
   for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
@@ -130,7 +163,7 @@ function mostCommon(values: string[]): string {
   return best;
 }
 
-function compose(group: Hit[]): { line: string; habit: string } {
+function compose(group: Hit[]): { line: string; habit: string; said: string } {
   const rule = group[0]!.rule;
   if (rule.kind === 'package-manager') {
     const desired = rule.key.slice('pm:'.length);
@@ -142,17 +175,23 @@ function compose(group: Hit[]): { line: string; habit: string } {
     return {
       line: `Use ${desired} for installs and scripts${example}. Never ${never}.`,
       habit: `${desired}, not ${never}`,
+      said: `use ${desired}`,
     };
   }
   if (rule.kind === 'command') {
     const purpose = rule.key.slice('cmd:'.length);
     const cmd = mostCommon(group.map((h) => h.rule.line));
-    return { line: `Run ${purpose} with \`${cmd}\`.`, habit: `How to run ${purpose}` };
+    return { line: `Run ${purpose} with \`${cmd}\`.`, habit: `How to run ${purpose}`, said: `run ${cmd}` };
   }
-  // Your own words, shortest version, since it was probably the clearest.
-  // A line that opens on a verb ("Don't add...") beats one that opens "No...".
-  const line = [...group.map((h) => h.rule.line)].sort(
-    (a, b) => Number(a.startsWith('No ')) - Number(b.startsWith('No ')) || a.length - b.length,
-  )[0]!;
-  return { line, habit: line.replace(/\.$/u, '') };
+  // Your own words, shortest version of each instruction, since it was
+  // probably the clearest. A line that opens on a verb ("Don't add...")
+  // beats one that opens "No...".
+  const byInstruction = new Map<string, string[]>();
+  for (const h of group) byInstruction.set(h.rule.key, [...(byInstruction.get(h.rule.key) ?? []), h.rule.line]);
+  const best = (lines: string[]) =>
+    [...lines].sort((a, b) => Number(a.startsWith('No ')) - Number(b.startsWith('No ')) || a.length - b.length)[0]!;
+  const instructions = mergeSimilar([...byInstruction.entries()]).map(best);
+  const line = instructions.join(' ');
+  const habit = instructions[0]!.replace(/\.$/u, '');
+  return { line, habit, said: habit.charAt(0).toLowerCase() + habit.slice(1) };
 }

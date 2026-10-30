@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ['better-sqlite3'],
-  transpilePackages: ['@trace/db', '@trace/shared'],
+  transpilePackages: ['@trace/coach', '@trace/db', '@trace/demo', '@trace/ingest', '@trace/parser', '@trace/shared'],
   webpack(config, { isServer }) {
     config.resolve.extensionAlias = {
       ...config.resolve.extensionAlias,

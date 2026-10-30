@@ -72,14 +72,18 @@ export function demoFiles(now: Date): DemoFile[] {
   const rand = mulberry32(7);
   const all: Script[] = [...scripts, ...fillerScripts(rand)];
 
-  // Today's sessions end shortly before now, spaced out, newest last.
+  // Today's sessions end shortly before now, newest last, spaced to fit
+  // between midnight and now when they can.
   const today = all.filter((s) => s.day === 0);
-  let cursor = now.getTime() - 25 * 60_000;
+  const room = now.getTime() - startOfDay(now) - 30 * 60_000;
+  const busy = today.reduce((sum, s) => sum + duration(s) * 1000, 0);
+  const gap = Math.max(4 * 60_000, Math.min(55 * 60_000, (room - busy) / Math.max(1, today.length)));
+  let cursor = now.getTime() - 12 * 60_000;
   const todayStart = new Map<string, number>();
   for (const s of [...today].reverse()) {
     const start = cursor - duration(s) * 1000;
     todayStart.set(s.id, start);
-    cursor = start - 70 * 60_000;
+    cursor = start - gap;
   }
 
   return all.map((s) => {
@@ -202,8 +206,8 @@ const TEST_CMD: Record<string, string> = {
 function fillerScripts(rand: () => number): Script[] {
   const out: Script[] = [];
   let k = 0;
-  for (let day = -20; day <= -1; day++) {
-    const count = Math.floor(rand() * 3) + (day % 7 === 0 || day % 7 === -1 ? 0 : 1);
+  for (let day = -20; day <= 0; day++) {
+    const count = day === 0 ? 2 : Math.floor(rand() * 3) + (day % 7 === 0 || day % 7 === -1 ? 0 : 1);
     for (let i = 0; i < count; i++) {
       const f = filler[Math.floor(rand() * filler.length)]!;
       const steps: Step[] = [];

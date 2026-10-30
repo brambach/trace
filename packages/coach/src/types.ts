@@ -51,6 +51,8 @@ export interface Fix {
   key: string;
   line: string;
   habit: string;
+  // What you keep telling the agent, short enough to quote in a sentence.
+  said: string;
   times: number;
   sessions: number;
   projects: string[];

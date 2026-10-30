@@ -26,9 +26,21 @@ importers:
 
   apps/dashboard:
     dependencies:
+      '@trace/coach':
+        specifier: workspace:*
+        version: link:../../packages/coach
       '@trace/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@trace/demo':
+        specifier: workspace:*
+        version: link:../../packages/demo
+      '@trace/ingest':
+        specifier: workspace:*
+        version: link:../../packages/ingest
+      '@trace/parser':
+        specifier: workspace:*
+        version: link:../../packages/parser
       '@trace/shared':
         specifier: workspace:*
         version: link:../../packages/shared

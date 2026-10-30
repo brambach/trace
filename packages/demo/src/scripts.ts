@@ -92,7 +92,7 @@ export const scripts: Script[] = [
     ],
   },
   {
-    id: 'a7', project: L, day: -1, at: 16, title: 'Export a year as a tax summary',
+    id: 'a7', project: L, day: 0, at: 0, title: 'Export a year as a tax summary',
     steps: [
       you('export a year of transactions as a tax summary csv, grouped by category', 0),
       agent('Adding `exportTaxSummary` and a button on the year view.', [write('src/export/tax-summary.ts'), edit('src/app/years/[year]/page.tsx')], 90),

@@ -35,7 +35,7 @@ export function getPatterns(db: TraceDb, days: number = 14): PatternsData {
   type WordRow = { word_count: number };
   const userPrompts = db.sqlite
     .prepare<[string], WordRow>(
-      `SELECT word_count FROM messages WHERE role = 'user' AND timestamp >= ?`,
+      `SELECT word_count FROM messages WHERE kind = 'prompt' AND timestamp >= ?`,
     )
     .all(sinceIso);
 
@@ -67,7 +67,7 @@ export function getPatterns(db: TraceDb, days: number = 14): PatternsData {
            SUM(has_error_message) AS err,
            SUM(is_interrogative)  AS interr,
            COUNT(*) AS total
-         FROM messages WHERE role = 'user' AND timestamp >= ?`,
+         FROM messages WHERE kind = 'prompt' AND timestamp >= ?`,
       )
       .get(sinceIso) ?? { fp: 0, cb: 0, err: 0, interr: 0, total: 0 };
 
@@ -156,7 +156,7 @@ function computeRetryPhrases(db: TraceDb, sinceIso: string) {
                COUNT(*) AS count,
                COUNT(DISTINCT session_id) AS sessions
              FROM messages
-             WHERE role = 'user' AND timestamp >= ? AND lower(content_text) LIKE ?`,
+             WHERE kind = 'prompt' AND timestamp >= ? AND lower(content_text) LIKE ?`,
           )
           .get(sinceIso, p.like) ?? { count: 0, sessions: 0 };
       return { phrase: p.phrase, count: r.count, sessions: r.sessions };
@@ -183,9 +183,9 @@ function computeDriftedSessions(db: TraceDb, sinceIso: string): DriftedSession[]
       `SELECT
          s.id, s.project_name, s.ai_title, s.ended_at,
          s.retry_signal_count, s.turn_count,
-         (SELECT AVG(word_count) FROM messages m WHERE m.session_id = s.id AND m.role = 'user') AS avg_user_words,
+         (SELECT AVG(word_count) FROM messages m WHERE m.session_id = s.id AND m.kind = 'prompt') AS avg_user_words,
          (SELECT COUNT(*) FROM messages m
-            WHERE m.session_id = s.id AND m.role = 'user' AND lower(m.content_text) LIKE ?) AS actually_count
+            WHERE m.session_id = s.id AND m.kind = 'prompt' AND lower(m.content_text) LIKE ?) AS actually_count
        FROM sessions s
        WHERE s.ended_at >= ?`,
     )
