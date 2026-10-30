@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  devIndicators: false,
   serverExternalPackages: ['better-sqlite3'],
   transpilePackages: ['@trace/coach', '@trace/db', '@trace/demo', '@trace/ingest', '@trace/parser', '@trace/shared'],
   webpack(config, { isServer }) {
