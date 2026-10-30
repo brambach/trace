@@ -181,7 +181,7 @@ function compose(group: Hit[]): { line: string; habit: string; said: string } {
   if (rule.kind === 'command') {
     const purpose = rule.key.slice('cmd:'.length);
     const cmd = mostCommon(group.map((h) => h.rule.line));
-    return { line: `Run ${purpose} with \`${cmd}\`.`, habit: `How to run ${purpose}`, said: `run ${cmd}` };
+    return { line: `Run ${purpose} with \`${cmd}\`.`, habit: `How to run ${purpose}`, said: `run \`${cmd}\`` };
   }
   // Your own words, shortest version of each instruction, since it was
   // probably the clearest. A line that opens on a verb ("Don't add...")

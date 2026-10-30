@@ -65,8 +65,16 @@ export function loadTimelines(db: TraceDb, filter: TimelineFilter = {}): Session
       text: m.content_text,
       tools: tools.get(m.id) ?? [],
     }));
-    return { ...s, events };
+    // Codex writes no title, so fall back to the first thing you asked.
+    return { ...s, ai_title: s.ai_title ?? titleFrom(events), events };
   });
+}
+
+function titleFrom(events: TimelineEvent[]): string | null {
+  const first = events.find((e) => e.kind === 'prompt')?.text.replace(/\s+/gu, ' ').trim();
+  if (!first) return null;
+  const clipped = first.length > 64 ? `${first.slice(0, 63).replace(/\s+\S*$/u, '')}…` : first;
+  return clipped.charAt(0).toUpperCase() + clipped.slice(1);
 }
 
 function parseArgs(json: string): Record<string, unknown> {

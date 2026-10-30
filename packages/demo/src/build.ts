@@ -209,7 +209,7 @@ function fillerScripts(rand: () => number): Script[] {
   for (let day = -20; day <= 0; day++) {
     const count = day === 0 ? 2 : Math.floor(rand() * 3) + (day % 7 === 0 || day % 7 === -1 ? 0 : 1);
     for (let i = 0; i < count; i++) {
-      const f = filler[Math.floor(rand() * filler.length)]!;
+      const f = filler[(k + Math.floor(rand() * 3)) % filler.length]!;
       const steps: Step[] = [];
       f.prompts.forEach((p, j) => {
         steps.push({ t: 'you', text: p, wait: j === 0 ? 0 : 40 + Math.floor(rand() * 120) });

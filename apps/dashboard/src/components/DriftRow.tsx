@@ -1,29 +1,17 @@
 import { relativeTime } from '@/lib/format';
 
-export function DriftRow({
-  id,
-  whenIso,
-  project,
-  reason,
-  flag,
-}: {
-  id: string;
-  whenIso: string;
-  project: string;
-  reason: string;
-  flag: 'DRIFT' | 'VAGUE' | 'SHIFTING';
-}) {
+const LABEL = { DRIFT: 'Kept redirecting', VAGUE: 'Short prompts, many turns', SHIFTING: 'Changed course' } as const;
+
+export function DriftRow({ id, title, whenIso, project, reason, flag }: { id: string; title: string | null; whenIso: string; project: string; reason: string; flag: keyof typeof LABEL }) {
   return (
-    <a
-      href={`/sessions/${id}`}
-      className="grid grid-cols-[1.4fr_1fr_1.6fr_auto] items-center gap-4 border-b border-rule py-3.5 transition-colors hover:bg-[rgba(160,90,63,0.04)]"
-    >
-      <span className="font-mono text-[11px] tracking-[0.06em] text-dim">{relativeTime(whenIso)}</span>
-      <span className="font-serif text-base">{project}</span>
-      <span className="font-serif italic text-sm leading-snug text-[#444]">{reason}</span>
-      <span className="rounded-full border border-bad/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-bad">
-        {flag}
-      </span>
+    <a href={`/sessions/${encodeURIComponent(id)}`} className="-mx-3 block rounded-[10px] px-3 py-3.5 transition-colors duration-[140ms] hover:bg-sunk">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+        <span className="text-[15.5px] font-medium">{title ?? 'Untitled session'}</span>
+        <span className="text-[13px] text-muted">{project} · {relativeTime(whenIso)}</span>
+      </div>
+      <div className="mt-1 text-[13.5px] text-ink-2">
+        <span className="font-medium">{LABEL[flag]}.</span> {reason}
+      </div>
     </a>
   );
 }

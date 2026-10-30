@@ -1,22 +1,13 @@
-export function PatternBar({
-  name,
-  pct,
-  delta,
-  emphasis = false,
-}: {
-  name: string;
-  pct: number;
-  delta?: string;
-  emphasis?: boolean;
-}) {
+export function PatternBar({ name, pct }: { name: string; pct: number }) {
   return (
-    <div className="grid grid-cols-[1fr_auto] items-baseline gap-2">
-      <span className="font-serif text-[15.5px]">{name}</span>
-      <span className="font-serif text-base tracking-[-0.01em] serif-numerals">{pct}%</span>
-      <div className="col-span-2 mt-1 h-1 overflow-hidden rounded-[2px] bg-quiet">
-        <div className={`h-full ${emphasis ? 'bg-accent' : 'bg-ink'}`} style={{ width: `${pct}%` }} />
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[15px] text-ink">{name}</span>
+        <span className="num text-[15px] text-ink-2">{pct}%</span>
       </div>
-      {delta && <span className="col-span-2 font-mono text-[10.5px] tracking-[0.04em] text-dim">{delta}</span>}
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-sunk">
+        <div className="h-full rounded-full bg-ink opacity-80" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }

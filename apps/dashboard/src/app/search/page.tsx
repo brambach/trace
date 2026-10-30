@@ -1,54 +1,49 @@
+import type { Metadata } from 'next';
 import { searchMessages } from '@trace/db';
 import { db } from '@/lib/db';
 import { relativeTime } from '@/lib/format';
 import { Masthead } from '@/components/Masthead';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Search' };
 
-export default async function SearchPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>;
-}) {
+export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q = '' } = await searchParams;
   const query = q.trim();
   const results = query === '' ? [] : searchMessages(db(), query, { limit: 50 });
 
-  const headline = query === '' ? 'Search every session.' : `Results for "${query}"`;
-  const deck =
-    query === ''
-      ? 'Type a phrase in the header search to find anything you ever said to Claude.'
-      : `${results.length} match${results.length === 1 ? '' : 'es'} across all sessions.`;
-
   return (
     <>
-      <Masthead eyebrow="Search" headline={headline} deck={deck} />
-      <div className="reveal r3 rule mb-6" />
-
-      <div className="reveal r4 flex flex-col">
+      <Masthead
+        eyebrow="Search"
+        headline={query === '' ? 'Find anything you said.' : `“${query}”`}
+        deck={query === '' ? 'Every prompt and reply, across every project and agent.' : `${results.length === 50 ? '50+' : results.length} match${results.length === 1 ? '' : 'es'}.`}
+      />
+      <form action="/search" className="relative mb-8">
+        <input
+          type="search"
+          name="q"
+          defaultValue={query}
+          autoFocus={query === ''}
+          placeholder="pnpm, the auth bug, force push…"
+          className="w-full rounded-full bg-sunk px-5 py-3 text-[16px] text-ink placeholder:text-faint focus:bg-raised focus:shadow-float focus:outline-none"
+        />
+      </form>
+      <div className="flex flex-col">
         {results.map((r) => (
           <a
             key={r.message_id}
-            href={`/sessions/${r.session_id}`}
-            className="block border-b border-rule py-4 transition-colors hover:bg-[rgba(200,155,123,0.06)]"
+            href={`/sessions/${encodeURIComponent(r.session_id)}?at=${encodeURIComponent(r.message_id)}`}
+            className="-mx-3 block rounded-[10px] px-3 py-4 transition-colors duration-[140ms] hover:bg-sunk"
           >
-            <div className="flex items-baseline justify-between gap-4">
-              <span className="font-serif text-base tracking-[-0.005em]">
-                {r.ai_title ?? '(untitled session)'}
-              </span>
-              <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.18em] text-dim">
-                {r.project_name} · {relativeTime(r.timestamp)}
-              </span>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+              <span className="text-[15.5px] font-medium">{r.ai_title ?? 'Untitled session'}</span>
+              <span className="text-[13px] text-muted">{r.project_name} · {relativeTime(r.timestamp)}</span>
             </div>
-            <p
-              className="mt-2 font-serif italic text-[14.5px] leading-snug text-[#444]"
-              dangerouslySetInnerHTML={{ __html: r.snippet }}
-            />
+            <p className="mt-1.5 text-[14.5px] leading-[1.55] text-ink-2" dangerouslySetInnerHTML={{ __html: r.snippet }} />
           </a>
         ))}
-        {query !== '' && results.length === 0 && (
-          <p className="py-6 italic text-dim">No matches.</p>
-        )}
+        {query !== '' && results.length === 0 && <p className="py-6 text-muted">Nothing matches.</p>}
       </div>
     </>
   );

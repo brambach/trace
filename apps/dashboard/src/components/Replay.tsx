@@ -132,7 +132,7 @@ export function Replay({ items, agent, startAt }: { items: ReplayItem[]; agent: 
 
   return (
     <>
-      <div className="sticky top-0 z-10 -mx-5 mb-8 border-b border-line bg-paper/90 px-5 py-3 backdrop-blur-md sm:-mx-14 sm:px-14">
+      <div className="sticky top-0 z-10 -mx-5 mb-8 border-b border-line [background:color-mix(in_srgb,var(--paper)_88%,transparent)] px-5 py-3 backdrop-blur-md sm:-mx-14 sm:px-14">
         <div className="flex items-center gap-4">
           <button
             type="button"

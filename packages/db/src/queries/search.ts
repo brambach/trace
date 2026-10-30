@@ -54,7 +54,7 @@ export function searchMessages(db: TraceDb, query: string, opts: SearchOptions =
     SELECT
       m.id AS message_id,
       m.session_id AS session_id,
-      s.ai_title AS ai_title,
+      COALESCE(s.ai_title, substr(s.first_user_message, 1, 64)) AS ai_title,
       s.project_name AS project_name,
       m.timestamp AS timestamp,
       m.role AS role,

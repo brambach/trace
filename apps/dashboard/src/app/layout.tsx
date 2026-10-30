@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
       <body className="min-h-screen bg-ground font-sans text-[15px] leading-[1.5] text-ink">
         <div className="mx-auto max-w-[980px] sm:px-6 sm:py-8">
-          <div className="min-h-screen overflow-hidden bg-paper shadow-lift sm:min-h-0 sm:rounded-[14px]">
+          <div className="min-h-screen overflow-clip bg-paper shadow-lift sm:min-h-0 sm:rounded-[14px]">
             {isDemo && <DemoBar />}
             <AppHeader />
             <main className="px-5 pb-16 pt-8 sm:px-14 sm:pb-20 sm:pt-12">{children}</main>

@@ -14,3 +14,4 @@ export {
 } from './claude-md.js';
 export { prSupport, openPullRequest, PullRequestError, type PrSupport } from './pull-request.js';
 export { hash } from './words.js';
+export { buildLetter, letterMarkdown, weekStartOf, isoWeek, type Letter, type LetterDay, type FixStatus } from './letter.js';

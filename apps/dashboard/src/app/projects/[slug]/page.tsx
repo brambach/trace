@@ -1,71 +1,54 @@
 import { notFound } from 'next/navigation';
-import { getProjectDetail } from '@trace/db';
-import { db } from '@/lib/db';
-import { Masthead } from '@/components/Masthead';
-import { Pill } from '@/components/Pill';
-import { relativeTime } from '@/lib/format';
+import type { Metadata } from 'next';
+import { Masthead, SectionHead } from '@/components/Masthead';
+import { SessionRow } from '@/components/SessionRow';
+import { Inline } from '@/components/Inline';
+import { getCoach, displayPath } from '@/lib/coach';
+import { plural, relativeTime } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProjectDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  const projectName = decodeURIComponent(slug);
-  const detail = getProjectDetail(db(), projectName);
-  if (!detail) notFound();
+type Props = { params: Promise<{ slug: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  return { title: decodeURIComponent((await params).slug) };
+}
+
+export default async function ProjectPage({ params }: Props) {
+  const name = decodeURIComponent((await params).slug);
+  const { timelines, corrections, views } = getCoach();
+  const sessions = timelines.filter((t) => t.project_name === name).reverse();
+  if (sessions.length === 0) notFound();
+  const correctionIds = new Set(corrections.map((c) => c.messageId));
+  const corrected = corrections.filter((c) => c.project_name === name).length;
+  const fixes = views.filter((v) => v.fix.projects.includes(name) && v.state !== 'dismissed');
 
   return (
     <>
       <Masthead
-        eyebrow="Project"
-        headline={detail.project_name}
-        deck={detail.current_focus ?? 'No focus generated yet.'}
+        eyebrow={`Project · ${displayPath(sessions[0]!.cwd)}`}
+        headline={name}
+        deck={`${plural(sessions.length, 'session')} in the last 60 days, the latest ${relativeTime(sessions[0]!.ended_at)}. You corrected the agent ${plural(corrected, 'time')}.`}
       />
-      <div className="reveal r3 rule mb-6" />
-
-      <div className="reveal r4 mb-7 flex items-baseline gap-4 font-mono text-[11.5px] tracking-[0.04em] text-dim">
-        <span>
-          <strong className="font-serif text-lg text-ink serif-numerals">{detail.total_sessions}</strong> sessions
-        </span>
-        <span className="h-3.5 w-px bg-rule" />
-        <span>
-          <strong className="font-serif text-lg text-ink serif-numerals">{detail.total_messages}</strong> messages
-        </span>
-        <span className="h-3.5 w-px bg-rule" />
-        <span>last touched {relativeTime(detail.last_touched)}</span>
-      </div>
-
-      <h2 className="reveal r5 mb-3 font-serif text-[22px] font-normal tracking-[-0.01em]">Sessions</h2>
-      <div className="reveal r6 flex flex-col">
-        {detail.sessions.length === 0 && (
-          <p className="py-6 italic text-dim">No sessions yet.</p>
-        )}
-        {detail.sessions.map((s) => (
-          <a
-            key={s.id}
-            href={`/sessions/${s.id}`}
-            className="block border-b border-rule py-5 transition-colors hover:bg-[rgba(200,155,123,0.06)]"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="font-serif text-[18px] tracking-[-0.01em]">
-                {s.ai_title ?? '(untitled session)'}
-              </span>
-              {s.ended_without_assistant_reply && <Pill variant="thread">OPEN THREAD</Pill>}
-            </div>
-            <p className="mt-1 font-serif italic text-[14.5px] leading-snug text-[#444]">
-              {s.first_user_message ?? ''}
-            </p>
-            <div className="mt-2 flex items-baseline gap-3 font-mono text-[10.5px] tracking-[0.06em] text-dim">
-              <span>{relativeTime(s.ended_at)}</span>
-              <span>·</span>
-              <span>
-                <strong className="font-serif text-base text-ink serif-numerals">{s.message_count}</strong> msg
-              </span>
-            </div>
-          </a>
+      {fixes.length > 0 && (
+        <section className="mb-12">
+          <SectionHead title="Fixes" />
+          <ul className="flex flex-col gap-2">
+            {fixes.map((v) => (
+              <li key={v.fix.id}>
+                <a href={`/fixes#fix-${v.fix.id}`} className="flex flex-wrap items-baseline gap-x-3 text-[15px] hover:underline">
+                  <span className={v.state === 'waiting' ? 'text-mark' : 'text-held'}>{v.state === 'waiting' ? 'Drafted' : v.state === 'applied' ? 'Applied' : 'Written down'}</span>
+                  <span className="text-ink"><Inline text={v.fix.line} /></span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <SectionHead title="Sessions" />
+      <div className="flex flex-col">
+        {sessions.map((s) => (
+          <SessionRow key={s.id} session={s} corrections={correctionIds} showProject={false} when="relative" />
         ))}
       </div>
     </>

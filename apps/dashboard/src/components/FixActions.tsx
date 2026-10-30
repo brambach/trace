@@ -44,7 +44,7 @@ export function FixActions({
           <span className="truncate">{path}</span>
           <span className="shrink-0">{creates ? 'new file' : written ? 'saved' : 'draft'}</span>
         </div>
-        <pre className="overflow-x-auto px-4 py-3 font-mono text-[13px] leading-[1.7] text-ink">
+        <pre className="whitespace-pre-wrap break-words px-4 py-3 font-mono text-[13px] leading-[1.7] text-ink">
           {added.map((line, i) => (
             <span
               key={i}
