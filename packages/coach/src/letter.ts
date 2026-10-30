@@ -14,6 +14,14 @@ export interface LetterDay {
   sessions: SessionTimeline[];
 }
 
+// One line of "What you worked on". Sessions that share a title collapse into
+// one line, since picking a task back up is the same piece of work.
+export interface LetterWork {
+  title: string;
+  latest: SessionTimeline;
+  sessions: number;
+}
+
 export interface Letter {
   weekStart: string;
   weekEnd: string;
@@ -22,7 +30,7 @@ export interface Letter {
   deck: string;
   days: LetterDay[];
   stats: { sessions: number; prompts: number; corrections: number; projects: number };
-  shipped: { project: string; sessions: SessionTimeline[] }[];
+  shipped: { project: string; sessions: SessionTimeline[]; work: LetterWork[] }[];
   sideways: { session: SessionTimeline; corrections: number }[];
   habit: { fix: Fix; thisWeek: number } | null;
   held: Fix[];
@@ -39,6 +47,20 @@ export function isoWeek(d: Date): number {
   t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
   const yearStart = Date.UTC(t.getUTCFullYear(), 0, 1);
   return Math.ceil(((t.getTime() - yearStart) / DAY + 1) / 7);
+}
+
+function workOf(sessions: SessionTimeline[]): LetterWork[] {
+  const byTitle = new Map<string, LetterWork>();
+  for (const s of sessions) {
+    const title = s.ai_title ?? 'Untitled session';
+    const seen = byTitle.get(title);
+    if (!seen) byTitle.set(title, { title, latest: s, sessions: 1 });
+    else {
+      seen.sessions += 1;
+      if (s.started_at > seen.latest.started_at) seen.latest = s;
+    }
+  }
+  return [...byTitle.values()];
 }
 
 // The week in one page, from local data only. Every sentence in it is
@@ -71,7 +93,7 @@ export function buildLetter(
   const byProject = new Map<string, SessionTimeline[]>();
   for (const s of sessions) byProject.set(s.project_name, [...(byProject.get(s.project_name) ?? []), s]);
   const shipped = [...byProject.entries()]
-    .map(([project, list]) => ({ project, sessions: list }))
+    .map(([project, list]) => ({ project, sessions: list, work: workOf(list) }))
     .sort((a, b) => b.sessions.length - a.sessions.length);
 
   const sideways = sessions
@@ -136,7 +158,7 @@ export function letterMarkdown(letter: Letter): string {
     out.push('## What you worked on', '');
     for (const p of letter.shipped) {
       out.push(`**${p.project}**`, '');
-      for (const s of p.sessions) out.push(`- ${s.ai_title ?? 'Untitled session'}`);
+      for (const w of p.work) out.push(`- ${w.title}${w.sessions > 1 ? ` (${w.sessions} sessions)` : ''}`);
       out.push('');
     }
   }

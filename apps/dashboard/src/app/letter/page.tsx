@@ -106,11 +106,12 @@ export default async function LetterPage({ searchParams }: { searchParams: Promi
                   <span className="num text-[13px] text-muted">{plural(p.sessions.length, 'session')}</span>
                 </div>
                 <ul className="mt-2 flex flex-col gap-1">
-                  {p.sessions.map((s) => (
-                    <li key={s.id}>
-                      <a href={`/sessions/${encodeURIComponent(s.id)}`} className="text-[14.5px] text-ink-2 hover:text-ink">
-                        {s.ai_title ?? 'Untitled session'}
+                  {p.work.map((w) => (
+                    <li key={w.latest.id}>
+                      <a href={`/sessions/${encodeURIComponent(w.latest.id)}`} className="text-[14.5px] text-ink-2 hover:text-ink">
+                        {w.title}
                       </a>
+                      {w.sessions > 1 && <span className="num ml-2 text-[13px] text-muted">{plural(w.sessions, 'session')}</span>}
                     </li>
                   ))}
                 </ul>
