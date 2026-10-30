@@ -1,3 +1,4 @@
+export const coach = `
 -- 0001_coach.sql
 -- What each message is (prompt, tool result, interrupt...), which agent wrote
 -- the session, and the fixes you applied or dismissed.
@@ -28,3 +29,4 @@ CREATE TABLE IF NOT EXISTS fixes (
   pr_url TEXT,
   decided_at TEXT NOT NULL
 );
+`;

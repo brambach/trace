@@ -1,10 +1,13 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import type { TraceDb } from './client.js';
+import { init } from './migrations/0000-init.js';
+import { coach } from './migrations/0001-coach.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const migrations = ['0000_init.sql', '0001_coach.sql'];
+// The SQL lives in modules, not .sql files, so bundlers ship it. The names keep
+// their .sql suffix because existing databases recorded them that way.
+const migrations: ReadonlyArray<readonly [string, string]> = [
+  ['0000_init.sql', init],
+  ['0001_coach.sql', coach],
+];
 
 // 0000 predates this table and is written to be rerun safely, so databases
 // created before migrations were tracked pick it up as already applied.
@@ -16,9 +19,8 @@ export function migrate(db: TraceDb): void {
       .all()
       .map((r) => r.name),
   );
-  for (const file of migrations) {
+  for (const [file, sql] of migrations) {
     if (applied.has(file)) continue;
-    const sql = readFileSync(join(here, 'migrations', file), 'utf8');
     db.sqlite.transaction(() => {
       db.sqlite.exec(sql);
       db.sqlite

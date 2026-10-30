@@ -6,8 +6,6 @@ const nextConfig = {
   devIndicators: false,
   serverExternalPackages: ['better-sqlite3'],
   outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
-  // Migrations are read from disk at runtime, so the tracer can't see them.
-  outputFileTracingIncludes: { '/**': ['../../packages/db/src/migrations/*.sql'] },
   transpilePackages: ['@trace/coach', '@trace/db', '@trace/demo', '@trace/ingest', '@trace/parser', '@trace/shared'],
   webpack(config, { isServer }) {
     config.resolve.extensionAlias = {
