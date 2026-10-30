@@ -1,7 +1,7 @@
 import chokidar from 'chokidar';
 import { CLAUDE_PROJECTS_DIR, CODEX_SESSIONS_DIR } from '@trace/shared';
 import type { TraceDb } from '@trace/db';
-import { processFile } from './process-file.js';
+import { processFile } from '@trace/ingest';
 
 export function startWatcher(db: TraceDb, dirs: string[] = [CLAUDE_PROJECTS_DIR, CODEX_SESSIONS_DIR]) {
   // chokidar v4 dropped glob support, so watch the directory and filter

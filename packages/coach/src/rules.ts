@@ -26,10 +26,12 @@ const PURPOSES: [Purpose, RegExp][] = [
 ];
 
 export function rulesFor(c: Correction): Rule[] {
-  const rules: Rule[] = [];
   const pm = packageManagerRule(c);
-  if (pm) rules.push(pm);
-  const cmd = commandRule(c, pm !== null);
+  const cmd = commandRule(c, pm?.explicit ?? false);
+  const rules: Rule[] = [];
+  // "no, `pnpm vitest run`" after "npx jest" is about the test command. Only
+  // keep the package manager rule too when you named both managers.
+  if (pm && (pm.explicit || !cmd)) rules.push(pm.rule);
   if (cmd) rules.push(cmd);
   if (rules.length === 0) rules.push(...yourWordsRules(c));
   return rules;
@@ -38,7 +40,7 @@ export function rulesFor(c: Correction): Rule[] {
 // "pnpm add dayjs" typed right after the agent ran "yarn add dayjs" is a
 // correction even with no redirect words in it.
 export function switchedPackageManager(text: string, before: ToolUse[]): boolean {
-  return packageManagerRule({ text, before } as Correction) !== null;
+  return packageManagerRule({ text, before }) !== null;
 }
 
 function normPm(w: string): string {
@@ -64,7 +66,7 @@ function pmsRun(before: ToolUse[]): { pm: string; command: string }[] {
   return out;
 }
 
-function packageManagerRule(c: Correction): Rule | null {
+function packageManagerRule(c: Pick<Correction, 'text' | 'before'>): { rule: Rule; explicit: boolean } | null {
   const t = c.text.toLowerCase();
   let desired: string | null = null;
   let rejected: string | null = null;
@@ -76,6 +78,7 @@ function packageManagerRule(c: Correction): Rule | null {
   if (thenNot) [desired, rejected] = [normPm(thenNot[1]!), normPm(thenNot[2]!)];
   else if (notThen) [rejected, desired] = [normPm(notThen[1]!), normPm(notThen[2]!)];
   else if (useIt) desired = normPm(useIt[1]!);
+  const explicit = desired !== null;
 
   const ran = pmsRun(c.before);
   if (!desired) {
@@ -93,12 +96,16 @@ function packageManagerRule(c: Correction): Rule | null {
 
   const did = wrongRun.at(-1) ? `ran \`${clip(wrongRun.at(-1)!.command)}\`` : null;
   return {
-    kind: 'package-manager',
-    key: `pm:${desired}`,
-    line: rejected,
-    habit: `${desired}, not ${rejected}`,
-    did,
-    needles: [desired],
+    explicit,
+    rule: {
+      kind: 'package-manager',
+      key: `pm:${desired}`,
+      // The rejected manager. The cluster turns these into the final line.
+      line: rejected,
+      habit: `${desired}, not ${rejected}`,
+      did,
+      needles: [desired],
+    },
   };
 }
 
@@ -152,10 +159,11 @@ function commandRule(c: Correction, hasPmRule: boolean): Rule | null {
   return null;
 }
 
-const DIRECTIVE_RE = /\b(?:don'?t|do not|never|always|stop|avoid|keep|use|prefer|only|no more|leave)\b/iu;
-const NEGATIVE_RE = /\b(?:don'?t|do not|never|stop|avoid|no more|not)\b/iu;
+const DIRECTIVE_RE = /\b(?:don'?t|do not|never|always|stop|avoid|keep|use|prefer|only|no more|leave)\b|^no\s+\w/iu;
+const NEGATIVE_RE = /\b(?:don'?t|do not|never|stop|avoid|no|not)\b/iu;
+// "no, use X" loses its "no"; "no comments" keeps it, since there it's the point.
 const LEAD_IN_RE =
-  /^(?:no|nope|actually|wait|again|ok(?:ay)?|please|hey|and|but|so|also|i said|i told you|like i said|as i said|remember)\b[,.!:\s]*/iu;
+  /^(?:(?:no|nope)[,.!:]+|(?:actually|wait|again|ok(?:ay)?|please|hey|and|but|so|also|i said|i told you|like i said|as i said|remember)\b[,.!:]*)\s*/iu;
 
 export function cleanDirective(sentence: string): string | null {
   let s = sentence.trim();

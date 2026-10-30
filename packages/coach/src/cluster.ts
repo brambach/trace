@@ -150,6 +150,9 @@ function compose(group: Hit[]): { line: string; habit: string } {
     return { line: `Run ${purpose} with \`${cmd}\`.`, habit: `How to run ${purpose}` };
   }
   // Your own words, shortest version, since it was probably the clearest.
-  const line = [...group.map((h) => h.rule.line)].sort((a, b) => a.length - b.length)[0]!;
+  // A line that opens on a verb ("Don't add...") beats one that opens "No...".
+  const line = [...group.map((h) => h.rule.line)].sort(
+    (a, b) => Number(a.startsWith('No ')) - Number(b.startsWith('No ')) || a.length - b.length,
+  )[0]!;
   return { line, habit: line.replace(/\.$/u, '') };
 }

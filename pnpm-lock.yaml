@@ -72,9 +72,9 @@ importers:
       '@trace/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@trace/parser':
+      '@trace/ingest':
         specifier: workspace:*
-        version: link:../../packages/parser
+        version: link:../../packages/ingest
       '@trace/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -129,6 +129,47 @@ importers:
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
+
+  packages/demo:
+    dependencies:
+      '@trace/coach':
+        specifier: workspace:*
+        version: link:../coach
+      '@trace/db':
+        specifier: workspace:*
+        version: link:../db
+      '@trace/ingest':
+        specifier: workspace:*
+        version: link:../ingest
+      '@trace/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
+  packages/ingest:
+    dependencies:
+      '@trace/db':
+        specifier: workspace:*
+        version: link:../db
+      '@trace/parser':
+        specifier: workspace:*
+        version: link:../parser
+      '@trace/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
 
   packages/parser:
     dependencies:

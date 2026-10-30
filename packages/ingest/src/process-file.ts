@@ -30,13 +30,7 @@ export function processFile(db: TraceDb, filePath: string): void {
   const consumeUpTo = lastNewline === -1 ? -1 : lastNewline;
   if (consumeUpTo === -1) return;
 
-  const codexSession = codexSessionIdFromPath(filePath);
-  const parse = (line: string, byteOffset: number): ParsedEvent | null =>
-    codexSession
-      ? parseCodexLine(line, { sessionId: codexSession, lineId: `${codexSession}:${byteOffset}` })
-      : parseLine(line);
-
-  const lines: { text: string; offset: number }[] = [];
+  const lines: SourceLine[] = [];
   let offset = start;
   for (const l of text.slice(0, consumeUpTo).split('\n')) {
     if (l !== '') lines.push({ text: l, offset });
@@ -44,16 +38,7 @@ export function processFile(db: TraceDb, filePath: string): void {
   }
 
   const txn = db.sqlite.transaction(() => {
-    const touchedSessions = new Set<string>();
-    for (const line of lines) {
-      const ev = parse(line.text, line.offset);
-      if (!ev) continue;
-      const sessionId = insertEvent(db, filePath, ev);
-      if (sessionId) touchedSessions.add(sessionId);
-    }
-    for (const sessionId of touchedSessions) {
-      recomputeSessionAggregates(db, sessionId);
-    }
+    ingestLines(db, filePath, lines);
     db.sqlite
       .prepare(
         `INSERT INTO file_offsets (session_file_path, last_byte_read, last_processed_at)
@@ -62,8 +47,35 @@ export function processFile(db: TraceDb, filePath: string): void {
            last_byte_read = excluded.last_byte_read,
            last_processed_at = excluded.last_processed_at`,
       )
-      .run(filePath, start + consumeUpTo + 1);
+      .run(filePath, start + Buffer.byteLength(text.slice(0, consumeUpTo), 'utf8') + 1);
   });
 
   txn();
+}
+
+export interface SourceLine {
+  text: string;
+  // Byte offset of the line in its file. Codex lines take their id from it.
+  offset: number;
+}
+
+// Parses and inserts lines from one session file, then recomputes the
+// aggregates of every session they touched. Callers own the transaction.
+export function ingestLines(db: TraceDb, filePath: string, lines: SourceLine[]): void {
+  const codexSession = codexSessionIdFromPath(filePath);
+  const parse = (line: SourceLine): ParsedEvent | null =>
+    codexSession
+      ? parseCodexLine(line.text, { sessionId: codexSession, lineId: `${codexSession}:${line.offset}` })
+      : parseLine(line.text);
+
+  const touchedSessions = new Set<string>();
+  for (const line of lines) {
+    const ev = parse(line);
+    if (!ev) continue;
+    const sessionId = insertEvent(db, filePath, ev);
+    if (sessionId) touchedSessions.add(sessionId);
+  }
+  for (const sessionId of touchedSessions) {
+    recomputeSessionAggregates(db, sessionId);
+  }
 }

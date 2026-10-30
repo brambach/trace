@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@trace/db": "workspace:*",
-    "@trace/parser": "workspace:*",
+    "@trace/ingest": "workspace:*",
     "@trace/shared": "workspace:*",
     "chokidar": "^4.0.0"
   },
