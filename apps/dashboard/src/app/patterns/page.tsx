@@ -1,133 +1,113 @@
+import type { Metadata } from 'next';
 import { getPatterns } from '@trace/db';
 import { db } from '@/lib/db';
-import { Masthead } from '@/components/Masthead';
+import { getCoach } from '@/lib/coach';
+import { Masthead, SectionHead } from '@/components/Masthead';
 import { LengthHistogram } from '@/components/LengthHistogram';
 import { PatternBar } from '@/components/PatternBar';
 import { DriftRow } from '@/components/DriftRow';
 import { derivePatternsHeadlineDeck } from '@/lib/patterns-derived';
+import { weekStartOf } from '@trace/coach';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Patterns' };
+
+const WEEK = 7 * 86_400_000;
 
 export default function PatternsPage() {
   const p = getPatterns(db(), 14);
   const { headline, deck } = derivePatternsHeadlineDeck(p);
+  const { timelines, corrections } = getCoach();
+
+  // Corrections per 10 prompts, week by week. Falling means the fixes work.
+  const thisWeek = weekStartOf(new Date()).getTime();
+  const weeks = Array.from({ length: 6 }, (_, i) => {
+    const start = thisWeek - (5 - i) * WEEK;
+    const inWeek = (iso: string) => Date.parse(iso) >= start && Date.parse(iso) < start + WEEK;
+    const prompts = timelines.flatMap((t) => t.events).filter((e) => e.kind === 'prompt' && inWeek(e.timestamp)).length;
+    const fixes = corrections.filter((c) => inWeek(c.timestamp)).length;
+    return { start, prompts, rate: prompts === 0 ? null : (10 * fixes) / prompts };
+  });
+  const maxRate = Math.max(0.5, ...weeks.map((w) => w.rate ?? 0));
+  const via = {
+    said: corrections.filter((c) => c.via === 'said').length,
+    interrupt: corrections.filter((c) => c.via === 'interrupt').length,
+    rejection: corrections.filter((c) => c.via === 'rejection').length,
+  };
+  const total = Math.max(1, corrections.length);
 
   return (
     <>
-      <Masthead eyebrow="Your prompting · last 14 days" headline={headline} deck={deck} />
-      <div className="reveal r3 rule mb-6" />
+      <Masthead eyebrow="Patterns · last 14 days" headline={headline} deck={deck} />
 
-      <section className="reveal r3">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="m-0 font-serif text-[22px] font-normal tracking-[-0.01em]">Prompt length</h2>
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-dim">
-            14 days · {p.total_user_prompts} user prompts
-          </span>
-        </div>
-        <LengthHistogram bins={p.length_histogram} />
-        <div className="mt-4 grid grid-cols-3 gap-6 font-mono text-[11px] tracking-[0.04em] text-dim">
-          <div>
-            <span className="block font-serif text-[22px] tracking-[-0.01em] text-ink serif-numerals">
-              {p.median_word_count}
-            </span>
-            Median words
-          </div>
-          <div>
-            <span className="block font-serif text-[22px] tracking-[-0.01em] text-ink serif-numerals">
-              {p.share_under_10_words}%
-            </span>
-            Under 10 words
-          </div>
-          <div>
-            <span className="block font-serif text-[22px] tracking-[-0.01em] text-ink serif-numerals">
-              {p.one_shot_rate_pct}%
-            </span>
-            One-shot rate (&le;3 turns)
-          </div>
-        </div>
-      </section>
-
-      <section className="reveal r4 mt-9">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="m-0 font-serif text-[22px] font-normal tracking-[-0.01em]">Prompt anatomy</h2>
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-dim">
-            Share of prompts containing each signal
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-x-12 gap-y-7">
-          <PatternBar name="File path" pct={p.prompt_anatomy.has_file_path_pct} emphasis />
-          <PatternBar name="Code block" pct={p.prompt_anatomy.has_code_block_pct} emphasis />
-          <PatternBar name="Error message" pct={p.prompt_anatomy.has_error_message_pct} />
-          <PatternBar name="Imperative" pct={p.prompt_anatomy.is_imperative_pct} />
-          <PatternBar name="Question, no context" pct={p.prompt_anatomy.is_interrogative_pct} />
-        </div>
-      </section>
-
-      <section className="reveal r5 mt-9">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="m-0 font-serif text-[22px] font-normal tracking-[-0.01em]">
-            Where you redirect Claude
-          </h2>
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-dim">
-            Most-used retry phrases
-          </span>
-        </div>
-        <div className="grid grid-cols-[1.5fr_1fr] gap-9">
-          <div className="flex flex-col">
-            {p.retry_phrases.length === 0 && (
-              <p className="py-3 italic text-dim">No retry phrases detected yet.</p>
-            )}
-            {p.retry_phrases.map((r, i) => (
-              <div key={r.phrase} className="grid grid-cols-[auto_1fr_auto] items-baseline gap-3 border-b border-rule py-2.5">
-                <span className="w-6 font-mono text-[10px] tracking-[0.18em] text-dim">
-                  {String(i + 1).padStart(2, '0')}
+      <section>
+        <SectionHead title="Are you correcting less?" note="Corrections per 10 prompts" />
+        <div className="grid h-32 grid-cols-6 gap-3 border-b border-line-strong">
+          {weeks.map((w, i) => (
+            <div key={w.start} className="relative h-full">
+              <div
+                className={`absolute inset-x-0 bottom-0 rounded-t-[3px] bg-mark ${i === weeks.length - 1 ? '' : 'opacity-40'}`}
+                style={{ height: `${w.rate === null ? 0 : Math.max(2, (w.rate / maxRate) * 80)}%` }}
+              />
+              {w.rate !== null && (
+                <span className="num absolute inset-x-0 text-center text-[12px] text-muted" style={{ bottom: `calc(${Math.max(2, (w.rate / maxRate) * 80)}% + 4px)` }}>
+                  {w.rate.toFixed(1)}
                 </span>
-                <span className="font-serif italic text-base">&quot;{r.phrase}&quot;</span>
-                <span className="font-mono text-[11px] tracking-[0.06em] text-dim">
-                  <strong className="font-serif text-base font-normal tracking-[-0.01em] text-ink">
-                    {r.count}
-                  </strong>{' '}
-                  · {r.sessions} session{r.sessions === 1 ? '' : 's'}
-                </span>
-              </div>
-            ))}
-          </div>
-          <aside className="border-l-2 border-accent bg-[rgba(200,155,123,0.08)] p-4 font-serif italic text-[15.5px] leading-snug text-[#2b2a28]">
-            <strong className="not-italic text-ink">Heuristic.</strong> Counts come straight from local data, no scoring by AI. Adding constraints up front tends to save 2 to 4 turns when these phrases would otherwise appear.
-            <span className="mt-2 block font-mono text-[9.5px] uppercase tracking-[0.18em] text-dim">
-              Derived · not a confident causal claim
-            </span>
-          </aside>
-        </div>
-      </section>
-
-      <section className="reveal r6 mt-9">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="m-0 font-serif text-[22px] font-normal tracking-[-0.01em]">Sessions that drifted</h2>
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-dim">
-            Likely doom loops · click to review
-          </span>
-        </div>
-        <div className="flex flex-col">
-          {p.drifted_sessions.length === 0 && (
-            <p className="py-3 italic text-dim">No drifted sessions in the last 14 days.</p>
-          )}
-          {p.drifted_sessions.map((s) => (
-            <DriftRow
-              key={s.id}
-              id={s.id}
-              whenIso={s.ended_at}
-              project={s.project_name}
-              reason={s.reason}
-              flag={s.flag}
-            />
+              )}
+            </div>
           ))}
         </div>
+        <div className="mt-2 grid grid-cols-6 gap-3 text-center font-mono text-[11px] text-faint">
+          {weeks.map((w, i) => (
+            <span key={w.start}>{i === weeks.length - 1 ? 'this week' : new Date(w.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}</span>
+          ))}
+        </div>
+        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
+          <PatternBar name="You redirected it" pct={Math.round((100 * via.said) / total)} />
+          <PatternBar name="You stopped it" pct={Math.round((100 * via.interrupt) / total)} />
+          <PatternBar name="You rejected a tool call" pct={Math.round((100 * via.rejection) / total)} />
+        </div>
       </section>
 
-      <p className="reveal r7 mt-12 border-t border-rule pt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-dim">
-        All metrics derived from local data, no scoring by AI
-      </p>
+      <section className="mt-14">
+        <SectionHead title="Prompt length" note={`${p.total_user_prompts} prompts`} />
+        <LengthHistogram bins={p.length_histogram} />
+        <div className="mt-5 grid grid-cols-3 gap-6">
+          <Stat value={String(p.median_word_count)} label="Median words" />
+          <Stat value={`${p.share_under_10_words}%`} label="Under 10 words" />
+          <Stat value={`${p.one_shot_rate_pct}%`} label="Done in 3 prompts or fewer" />
+        </div>
+      </section>
+
+      <section className="mt-14">
+        <SectionHead title="What your prompts carry" />
+        <div className="grid grid-cols-1 gap-x-12 gap-y-6 sm:grid-cols-2">
+          <PatternBar name="A file path" pct={p.prompt_anatomy.has_file_path_pct} />
+          <PatternBar name="A code block" pct={p.prompt_anatomy.has_code_block_pct} />
+          <PatternBar name="An error message" pct={p.prompt_anatomy.has_error_message_pct} />
+          <PatternBar name="A question" pct={p.prompt_anatomy.is_interrogative_pct} />
+        </div>
+      </section>
+
+      {p.drifted_sessions.length > 0 && (
+        <section className="mt-14">
+          <SectionHead title="Sessions that drifted" />
+          {p.drifted_sessions.map((s) => (
+            <DriftRow key={s.id} id={s.id} title={s.ai_title} whenIso={s.ended_at} project={s.project_name} reason={s.reason} flag={s.flag} />
+          ))}
+        </section>
+      )}
+
+      <p className="mt-14 border-t border-line pt-4 text-[13px] text-muted">Counted from your session files. No model scores anything here.</p>
     </>
+  );
+}
+
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <div className="num text-[26px] font-medium tracking-[-0.01em] text-ink">{value}</div>
+      <div className="text-[13px] text-muted">{label}</div>
+    </div>
   );
 }

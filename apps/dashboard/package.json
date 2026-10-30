@@ -10,7 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@trace/coach": "workspace:*",
     "@trace/db": "workspace:*",
+    "@trace/demo": "workspace:*",
+    "@trace/ingest": "workspace:*",
+    "@trace/parser": "workspace:*",
     "@trace/shared": "workspace:*",
     "better-sqlite3": "^11.3.0",
     "next": "^15.0.0",

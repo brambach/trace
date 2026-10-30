@@ -22,7 +22,12 @@ export function searchMessages(db: TraceDb, query: string, opts: SearchOptions =
 
   const limit = opts.limit ?? 50;
   const filters: string[] = [];
-  const params: (string | number)[] = [trimmed];
+  // Quote each word so FTS5 syntax ("-", ":", a stray quote) can't throw.
+  const match = trimmed
+    .split(/\s+/u)
+    .map((w) => `"${w.replaceAll('"', '""')}"`)
+    .join(' ');
+  const params: (string | number)[] = [match];
 
   if (opts.role) {
     filters.push('m.role = ?');
@@ -49,19 +54,28 @@ export function searchMessages(db: TraceDb, query: string, opts: SearchOptions =
     SELECT
       m.id AS message_id,
       m.session_id AS session_id,
-      s.ai_title AS ai_title,
+      COALESCE(s.ai_title, substr(s.first_user_message, 1, 64)) AS ai_title,
       s.project_name AS project_name,
       m.timestamp AS timestamp,
       m.role AS role,
-      snippet(messages_fts, 0, '<mark>', '</mark>', '…', 16) AS snippet
+      snippet(messages_fts, 0, char(1), char(2), '…', 16) AS snippet
     FROM messages_fts
     JOIN messages m ON m.id = messages_fts.message_id
     JOIN sessions s ON s.id = m.session_id
-    WHERE messages_fts MATCH ?
+    WHERE messages_fts MATCH ? AND m.kind IN ('prompt','reply','rejection')
     ${where}
     ORDER BY m.timestamp DESC
     LIMIT ${limit}
   `;
 
-  return db.sqlite.prepare<typeof params, Row>(sql).all(...params);
+  // The snippet is your own text, so escape it before the dashboard renders it
+  // as HTML. Only the match markers become tags.
+  return db.sqlite
+    .prepare<typeof params, Row>(sql)
+    .all(...params)
+    .map((r) => ({ ...r, snippet: escapeHtml(r.snippet).replaceAll('\u0001', '<mark>').replaceAll('\u0002', '</mark>') }));
+}
+
+function escapeHtml(s: string): string {
+  return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }

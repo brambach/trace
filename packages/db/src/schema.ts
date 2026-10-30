@@ -20,6 +20,7 @@ export const sessions = sqliteTable('sessions', {
     .notNull()
     .default(false),
   retry_signal_count: integer('retry_signal_count').notNull().default(0),
+  agent: text('agent', { enum: ['claude', 'codex'] }).notNull().default('claude'),
 });
 
 export const messages = sqliteTable('messages', {
@@ -40,6 +41,11 @@ export const messages = sqliteTable('messages', {
   has_error_message: integer('has_error_message', { mode: 'boolean' }).notNull().default(false),
   is_interrogative: integer('is_interrogative', { mode: 'boolean' }).notNull().default(false),
   retry_signal: integer('retry_signal', { mode: 'boolean' }).notNull().default(false),
+  kind: text('kind', {
+    enum: ['prompt', 'reply', 'tool_result', 'interrupt', 'rejection', 'meta'],
+  })
+    .notNull()
+    .default('prompt'),
 });
 
 export const toolCalls = sqliteTable('tool_calls', {
@@ -70,4 +76,15 @@ export const fileOffsets = sqliteTable('file_offsets', {
   session_file_path: text('session_file_path').primaryKey(),
   last_byte_read: integer('last_byte_read').notNull().default(0),
   last_processed_at: text('last_processed_at').notNull(),
+});
+
+export const fixes = sqliteTable('fixes', {
+  id: text('id').primaryKey(),
+  rule_key: text('rule_key').notNull(),
+  target_path: text('target_path').notNull(),
+  line: text('line').notNull(),
+  status: text('status', { enum: ['applied', 'dismissed'] }).notNull(),
+  how: text('how', { enum: ['local', 'pr'] }),
+  pr_url: text('pr_url'),
+  decided_at: text('decided_at').notNull(),
 });

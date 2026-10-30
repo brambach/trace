@@ -7,3 +7,5 @@ export * from './queries/project-detail.js';
 export * from './queries/search.js';
 export * from './queries/patterns.js';
 export * from './queries/session-detail.js';
+export * from './queries/timelines.js';
+export * from './queries/fixes.js';

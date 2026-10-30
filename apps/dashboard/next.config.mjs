@@ -1,8 +1,12 @@
+import { fileURLToPath } from 'node:url';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  devIndicators: false,
   serverExternalPackages: ['better-sqlite3'],
-  transpilePackages: ['@trace/db', '@trace/shared'],
+  outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
+  transpilePackages: ['@trace/coach', '@trace/db', '@trace/demo', '@trace/ingest', '@trace/parser', '@trace/shared'],
   webpack(config, { isServer }) {
     config.resolve.extensionAlias = {
       ...config.resolve.extensionAlias,

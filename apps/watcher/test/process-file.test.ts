@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getDb, closeDb, type TraceDb } from '@trace/db';
-import { processFile } from '../src/process-file.js';
+import { processFile } from '@trace/ingest';
 
 let dir: string;
 let db: TraceDb;

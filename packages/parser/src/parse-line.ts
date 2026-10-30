@@ -3,6 +3,7 @@ import type { ParsedEvent } from '@trace/shared';
 import { extractText } from './extract-text.js';
 import { extractToolCalls } from './extract-tool-calls.js';
 import { computeFeatures } from './features.js';
+import { classifyUserContent } from './classify.js';
 
 export function parseLine(json: string): ParsedEvent | null {
   let raw: unknown;
@@ -20,20 +21,28 @@ export function parseLine(json: string): ParsedEvent | null {
     case 'user':
     case 'assistant': {
       const role = line.message.role;
-      const contentText = extractText(line.message.content);
+      const extracted = extractText(line.message.content);
+      const classified =
+        role === 'user'
+          ? classifyUserContent(line.message.content, extracted, line.isMeta === true)
+          : { kind: 'reply' as const };
+      const contentText = classified.text ?? extracted;
+      const kind = classified.kind;
       const tokenCountEstimate = Math.ceil(contentText.length / 4);
       return {
         kind: 'message',
         sessionId: line.sessionId,
         uuid: line.uuid,
         role,
+        messageKind: kind,
+        agent: 'claude',
         timestamp: line.timestamp,
         cwd: line.cwd,
         gitBranch: line.gitBranch,
         contentRaw: line.message.content,
         contentText,
         tokenCountEstimate,
-        features: computeFeatures(contentText, role),
+        features: computeFeatures(contentText, kind === 'prompt' || kind === 'rejection' ? 'user' : 'assistant'),
         toolCalls: role === 'assistant' ? extractToolCalls(line.message.content) : [],
       };
     }

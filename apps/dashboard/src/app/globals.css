@@ -2,79 +2,136 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Trace reads like a marked-up proof. Ink on warm paper, and one red pencil
+  that means one thing: a place where you corrected the agent. Sage means a
+  fix held. Nothing else gets color.
+*/
 :root {
-  --paper: #f6f3ec;
-  --ink: #1a1a1a;
-  --dim: #8a7e63;
-  --accent: #c89b7b;
-  --rule: rgba(26, 26, 26, 0.18);
-  --quiet: rgba(26, 26, 26, 0.06);
-  --page: #ddd6c7;
-  --good: #4a7a3f;
-  --bad: #a05a3f;
-  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  color-scheme: light;
+  --ground: #ebe7de;
+  --paper: #f8f6f1;
+  --raised: #fffdf9;
+  --sunk: #f0ede6;
+  --ink: #1c1b18;
+  --ink-2: #45433d;
+  --muted: #706c64;
+  --faint: #8c877d;
+  --line: #e4e0d6;
+  --line-strong: #d3cec2;
+  --mark: #c23b22;
+  --mark-wash: #f8e8e2;
+  --held: #4f6b45;
+  --held-wash: #e8eee3;
+  --primary: #1c1b18;
+  --on-primary: #f8f6f1;
+
+  --lift:
+    0 0 0 1px rgb(40 32 20 / 0.05),
+    0 1px 2px rgb(40 32 20 / 0.05),
+    0 24px 60px -30px rgb(60 44 24 / 0.28);
+  --float:
+    0 0 0 1px var(--line),
+    0 4px 10px -4px rgb(40 32 20 / 0.1),
+    0 18px 40px -18px rgb(60 44 24 / 0.3);
+
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-move: cubic-bezier(0.45, 0, 0.55, 1);
+  --ease-signature: cubic-bezier(0.2, 1.4, 0.4, 1);
+  --dur-fast: 140ms;
+  --dur-calm: 220ms;
+  --dur-move: 320ms;
+  --dur-arrive: 480ms;
 }
 
-html, body { background: var(--page); }
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ground: #0e0d0c;
+    --paper: #161513;
+    --raised: #1f1d1a;
+    --sunk: #262420;
+    --ink: #eeebe4;
+    --ink-2: #cdc8be;
+    --muted: #a19c92;
+    --faint: #8a857b;
+    --line: #2a2825;
+    --line-strong: #3d3a35;
+    --mark: #e8775d;
+    --mark-wash: #3a221b;
+    --held: #a3c193;
+    --held-wash: #1f291c;
+    --primary: #eeebe4;
+    --on-primary: #161513;
+    --lift: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 24px 60px -30px rgb(0 0 0 / 0.8);
+    --float: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 0 1px var(--line-strong), 0 18px 48px -18px rgb(0 0 0 / 0.7);
+  }
+}
+
+html {
+  background: var(--ground);
+  -webkit-text-size-adjust: 100%;
+}
 
 body {
+  background: var(--ground);
+  color: var(--ink);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  font-feature-settings: 'tnum' 0;
 }
 
-.serif-numerals { font-feature-settings: "lnum" 1, "tnum" 1; }
-
-@keyframes rise {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes drawRule { to { transform: scaleX(1); } }
-@keyframes breathe {
-  0%, 100% { opacity: 0.4; transform: scale(0.85); }
-  50%      { opacity: 1;   transform: scale(1.1); }
-}
-@keyframes breatheToday {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.18); }
-}
-@keyframes drawLine { to { stroke-dashoffset: 0; } }
-@keyframes fadeIn { to { opacity: 1; } }
-
-.reveal { opacity: 0; transform: translateY(8px); animation: rise 720ms var(--ease) forwards; }
-.r1 { animation-delay: 40ms; }
-.r2 { animation-delay: 200ms; }
-.r3 { animation-delay: 380ms; }
-.r4 { animation-delay: 560ms; }
-.r5 { animation-delay: 760ms; }
-.r6 { animation-delay: 960ms; }
-.r7 { animation-delay: 1160ms; }
-
-.rule {
-  position: relative; height: 1px; background: transparent; overflow: hidden;
-}
-.rule::after {
-  content: ''; position: absolute; inset: 0; background: var(--ink); opacity: 0.18;
-  transform-origin: left center; transform: scaleX(0);
-  animation: drawRule 700ms var(--ease) 320ms forwards;
+::selection {
+  background: var(--mark-wash);
+  color: var(--ink);
 }
 
-.breathe { animation: breathe 1.6s ease-in-out infinite; }
-.breathe-today { animation: breatheToday 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ink) 60%, transparent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+mark {
+  background: var(--mark-wash);
+  color: var(--ink);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Arrivals caused by something you did, never on page load. */
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+.arrive { animation: arrive var(--dur-calm) var(--ease-out) both; }
+.slide-in { animation: slide-in var(--dur-arrive) var(--ease-signature) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal { animation: none !important; opacity: 1 !important; transform: none !important; }
-  .rule::after { animation: none !important; transform: scaleX(1) !important; }
-  .breathe, .breathe-today { animation: none !important; }
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
 }
 
-.eyebrow {
-  font-family: var(--font-mono, 'SF Mono', 'IBM Plex Mono', ui-monospace, monospace);
-  font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim);
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* A fix writing itself into CLAUDE.md, left to right. */
+@keyframes write-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
 }
-.section-label { @apply eyebrow; }
-.headline {
-  font-size: 38px; line-height: 1.08; letter-spacing: -0.012em;
-  font-family: 'Iowan Old Style', 'Apple Garamond', 'Hoefler Text', Georgia, serif;
-  font-weight: 400;
-}
-.deck { font-style: italic; font-size: 15.5px; color: #4a4a4a; line-height: 1.45; }

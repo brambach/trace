@@ -7,32 +7,35 @@ The full design is in `docs/superpowers/specs/2026-04-26-trace-design.md`. CLAUD
 ## Tech stack
 
 - **Runtime**: Node.js (latest LTS), TypeScript everywhere, strict mode
-- **File watcher**: `chokidar` watching `~/.claude/projects/`
+- **File watcher**: `chokidar` watching `~/.claude/projects/` and `~/.codex/sessions/`
 - **Storage**: SQLite via `better-sqlite3`. Schema managed with Drizzle ORM
-- **Dashboard**: Next.js 15 (App Router), TypeScript, Tailwind, shadcn/ui
-- **Charts**: Recharts unless something specific demands d3
-- **AI summaries**: Anthropic API. Use `claude-haiku-4-5-20251001` for daily summaries (cheap, fast). Use `claude-sonnet-4-6` for weekly synthesis where pattern recognition matters more
-- **Background jobs**: `node-cron` for scheduling. Watcher runs as a launchd agent on macOS
+- **Dashboard**: Next.js 15 (App Router), TypeScript, Tailwind. Hand-drawn SVG for the session strip and charts
+- **Type**: Instrument Serif (display), Hanken Grotesk (body), IBM Plex Mono (labels), loaded with `next/font/google`
+- **No model calls**: the coach and the letter are deterministic. They count and quote, they never judge
+- **Background jobs**: the watcher writes the Friday letter on a timer. Watcher runs as a launchd agent on macOS
 - **Auth**: None for v1. Single-user, single-machine. Add Clerk only if this becomes multi-user
 
 Do not suggest: Postgres, Prisma, separate frontend/backend frameworks, Docker, Kubernetes, message queues, Redis, microservices, GraphQL. One repo, one machine, one user.
 
 ## Architecture
 
-Three processes:
+Two processes:
 
-1. **Watcher**: Subscribes to filesystem events on `~/.claude/projects/`. On change, parses the appended JSONL lines and inserts into SQLite. Tracks each session file's last-read offset so reruns are idempotent. Runs as a launchd agent.
+1. **Watcher**: Subscribes to filesystem events on `~/.claude/projects/` and `~/.codex/sessions/`. On change, parses the appended lines and inserts into SQLite. Tracks each session file's last-read offset so reruns are idempotent. Writes the weekly letter to `~/Trace/letters/` every Friday at 5pm. Runs as a launchd agent.
 
-2. **Summarizer**: Cron at 9pm local. Pulls the day's rows, formats a structured prompt, sends to Claude. Stores the response in a `summaries` table. Also writes a markdown file to `~/Trace/summaries/YYYY-MM-DD.md` for offline reading. Weekly variant runs Sunday 9pm.
+2. **Dashboard**: Next.js app reading from the same SQLite database. It writes in two places only: the `fixes` table, and a CLAUDE.md when I press Apply (or a branch and PR when I press Open PR).
 
-3. **Dashboard**: Next.js app reading from the same SQLite database. Read-only against the data layer.
+The coach runs at read time. It finds corrections (a redirect phrase, an interrupt, a rejected tool call, a package manager swap), groups the ones that repeat across two or more sessions, and drafts one CLAUDE.md line per habit.
+
+`TRACE_DEMO=1` swaps the database for one built in memory from made-up sessions in `packages/demo`. The public demo runs that way.
 
 ## Schema (first cut, evolve as needed)
 
 - `sessions`: id, project_path, started_at, ended_at, message_count, tool_call_count
-- `messages`: id, session_id, role, content, timestamp, token_count_estimate
+- `sessions` also has `agent` (claude-code or codex)
+- `messages`: id, session_id, role, kind (prompt, reply, tool_result, interrupt, rejection, meta), content, timestamp, token_count_estimate
 - `tool_calls`: id, session_id, tool_name, arguments_json, result_summary, timestamp
-- `summaries`: id, period (daily|weekly|monthly), date, content_md, model_used, generated_at
+- `fixes`: id, rule_key, target_path, line, status (applied or dismissed), how (local or pr), pr_url, decided_at
 - `file_offsets`: session_file_path, last_byte_read, last_processed_at
 
 ## Repo layout
@@ -41,11 +44,13 @@ Three processes:
 trace/
   apps/
     dashboard/         # Next.js 15
-    watcher/           # Long-running file watcher
-    summarizer/        # Cron-triggered summary job
+    watcher/           # Long-running file watcher, Friday letter
   packages/
-    db/                # Drizzle schema and queries
-    parser/            # Claude Code JSONL parsing logic
+    coach/             # Corrections, fixes, CLAUDE.md edits, PRs, the letter
+    db/                # Drizzle schema, migrations, queries
+    demo/              # Made-up sessions for the public demo
+    ingest/            # Lines to rows, shared by watcher and demo
+    parser/            # Claude Code and Codex line parsing
     shared/            # Types, constants
 ```
 
@@ -55,15 +60,17 @@ pnpm workspaces.
 
 Build:
 
-- File watcher writing to SQLite (with FTS5 on message text)
-- Three pillars in the dashboard:
-  - Recall: search across every session, session detail reading view
-  - Portfolio: today (masthead + project ledger), projects (portfolio grid), project detail
-  - Patterns: deterministic prompt-feature surface (length distribution, anatomy, one-shot rate, retry phrases, drifted sessions)
-- Daily and weekly summary cron with markdown output (Weekend 2)
-- Tool call extraction at parse time, surfaced Weekend 2
+- File watcher writing to SQLite (with FTS5 on message text), for Claude Code and Codex
+- The coach: repeated corrections become CLAUDE.md fixes, applied in one click as a local edit or a PR, and tracked afterward (held or said again)
+- Today: the day's session strip, the fix teaser, sessions
+- Session replay with the session strip and corrections marked in red
+- The weekly letter, on the page and as markdown
+- Recall: search across every session
+- Projects and project detail
+- Patterns: deterministic prompt features and the correction rate over time
+- A public demo on made-up sessions
 
-Patterns counts features, never scores quality. LLM-judged coaching is a v2 idea ("coach"), held until v1 has been used daily for a month.
+The coach counts and quotes. It never scores quality or calls a model. LLM-judged coaching waits until the deterministic coach has been used daily for a month.
 
 Skip:
 
@@ -115,8 +122,4 @@ Commit and push to the GitHub remote (`brambach/trace`) whenever a coherent unit
 
 ## Current focus
 
-Weekend 1: watcher plus SQLite plus minimal dashboard reading from it. No summaries yet. Goal is to prove the data pipeline end to end and see the first chart populate from real data.
-
-Weekend 2: summarizer cron, dashboard polish, time-of-day heatmap.
-
-After that: I use it for two weeks before deciding what to build next.
+The coach shipped. Use it daily for two weeks on real sessions before deciding what to build next. Watch for fixes that read wrong or miss a habit, and tune the rules in `packages/coach` against those cases.

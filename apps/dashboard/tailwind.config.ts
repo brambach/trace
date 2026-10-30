@@ -1,37 +1,41 @@
 import type { Config } from 'tailwindcss';
 
+const v = (name: string) => `var(--${name})`;
+
 export default {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        paper: '#f6f3ec',
-        ink: '#1a1a1a',
-        dim: '#8a7e63',
-        accent: '#c89b7b',
-        rule: 'rgba(26, 26, 26, 0.18)',
-        quiet: 'rgba(26, 26, 26, 0.06)',
-        page: '#ddd6c7',
-        good: '#4a7a3f',
-        bad: '#a05a3f',
+        ground: v('ground'),
+        paper: v('paper'),
+        raised: v('raised'),
+        sunk: v('sunk'),
+        ink: v('ink'),
+        'ink-2': v('ink-2'),
+        muted: v('muted'),
+        faint: v('faint'),
+        line: v('line'),
+        'line-strong': v('line-strong'),
+        mark: v('mark'),
+        'mark-wash': v('mark-wash'),
+        held: v('held'),
+        'held-wash': v('held-wash'),
+        primary: v('primary'),
+        'on-primary': v('on-primary'),
       },
       fontFamily: {
-        serif: [
-          'Iowan Old Style',
-          'Apple Garamond',
-          'Hoefler Text',
-          'Georgia',
-          'Times New Roman',
-          'serif',
-        ],
-        mono: [
-          'SF Mono',
-          'IBM Plex Mono',
-          'JetBrains Mono',
-          'ui-monospace',
-          'Menlo',
-          'monospace',
-        ],
+        display: ['var(--font-display)', 'Georgia', 'serif'],
+        sans: ['var(--font-sans)', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      boxShadow: {
+        lift: v('lift'),
+        float: v('float'),
+      },
+      transitionTimingFunction: {
+        out: v('ease-out'),
+        move: v('ease-move'),
       },
     },
   },

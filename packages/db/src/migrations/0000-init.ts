@@ -1,7 +1,6 @@
+export const init = `
 -- 0000_init.sql
 
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
@@ -103,3 +102,4 @@ BEGIN
   INSERT INTO messages_fts (rowid, content_text, session_id, message_id, timestamp)
   VALUES (new.rowid, new.content_text, new.session_id, new.id, new.timestamp);
 END;
+`;

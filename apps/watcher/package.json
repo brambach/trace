@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "letter": "tsx src/write-letter.ts"
   },
   "dependencies": {
+    "@trace/coach": "workspace:*",
     "@trace/db": "workspace:*",
-    "@trace/parser": "workspace:*",
+    "@trace/ingest": "workspace:*",
     "@trace/shared": "workspace:*",
     "chokidar": "^4.0.0"
   },

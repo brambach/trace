@@ -1,83 +1,93 @@
-import {
-  getTodaySummary,
-  getProjectLedgerForToday,
-  getDailyMessageCounts,
-} from '@trace/db';
-import { db } from '@/lib/db';
-import { Masthead } from '@/components/Masthead';
-import { ProjectRow } from '@/components/ProjectRow';
-import { AmbientChart } from '@/components/AmbientChart';
-import { humanInt, todayIso, formatDate } from '@/lib/format';
+import { Masthead, SectionHead } from '@/components/Masthead';
+import { SessionRow } from '@/components/SessionRow';
+import { Strip } from '@/components/Strip';
+import { FixTeaser } from '@/components/FixTeaser';
+import { getCoach } from '@/lib/coach';
+import { linearScale, marksFor } from '@/lib/marks';
+import { formatDay, formatTime, plural, spell, todayIso } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
-export default function Home() {
+export default function Today() {
+  const { timelines, corrections, views } = getCoach();
+  const correctionIds = new Set(corrections.map((c) => c.messageId));
   const today = todayIso();
-  const summary = getTodaySummary(db(), today);
-  const ledger = getProjectLedgerForToday(db(), today);
-  const fourteen = getDailyMessageCounts(db(), 14);
+  const todays = timelines.filter((t) => t.ended_at.slice(0, 10) === today).reverse();
+  const recent = todays.length > 0 ? todays : [...timelines].reverse().slice(0, 6);
 
-  const eyebrow = `Today · ${formatDate(`${today}T12:00:00Z`)}`;
-  const headline = summary.headline ?? 'Quiet day.';
+  const marks = todays.flatMap((s) => marksFor(s, correctionIds));
+  const prompts = marks.filter((m) => m.kind !== 'tool').length;
+  const corrected = marks.filter((m) => m.kind === 'correction').length;
+  const projects = new Set(todays.map((t) => t.project_name)).size;
+  const first = todays.at(-1)?.started_at;
+  const t0 = first ? Date.parse(first) - 20 * 60_000 : 0;
+  const t1 = Date.now();
 
-  const sessionCount = summary.session_count;
-  const projectsCount = ledger.filter((p) => p.session_count > 0).length;
-  const stalledCount = ledger.length - projectsCount;
-  const ledgerLabel = `${sessionCount} session${sessionCount === 1 ? '' : 's'} · ${projectsCount} active${stalledCount > 0 ? ` · ${stalledCount} quiet` : ''}`;
+  const headline =
+    todays.length === 0
+      ? 'Quiet day so far.'
+      : corrected === 0
+        ? 'Nothing to correct today.'
+        : `You corrected the agent ${corrected === 1 ? 'once' : `${spell(corrected)} times`} today.`;
+  const deck =
+    todays.length === 0
+      ? 'Run Claude Code or Codex in any project and today fills in as you work.'
+      : `${plural(prompts, 'prompt')} across ${plural(todays.length, 'session')} in ${plural(projects, 'project')}.`;
+
+  const waiting = views.filter((v) => v.state === 'waiting');
 
   return (
     <>
-      <Masthead eyebrow={eyebrow} headline={headline} deck={summary.deck} />
+      <Masthead eyebrow={formatDay(`${today}T12:00:00Z`)} headline={headline} deck={deck} />
 
-      <div className="reveal r3 mb-7 flex items-center gap-4 font-mono text-[11.5px] tracking-[0.04em] text-dim">
-        <span>
-          <strong className="font-serif text-lg text-ink serif-numerals">{summary.message_count}</strong>{' '}
-          messages
-        </span>
-        <span className="h-3.5 w-px bg-rule" />
-        <span>
-          <strong className="font-serif text-lg text-ink serif-numerals">{summary.session_count}</strong>{' '}
-          sessions
-        </span>
-        <span className="h-3.5 w-px bg-rule" />
-        <span>
-          <strong className="font-serif text-lg text-ink serif-numerals">{humanInt(summary.token_estimate)}</strong>{' '}
-          tokens
-        </span>
-      </div>
+      {todays.length > 0 && (
+        <section className="mb-12" aria-label="Today as a strip">
+          <Strip marks={marks} x={linearScale(t0, t1)} height={88} label={`${prompts} prompts today, ${corrected} corrections`} />
+          <div className="mt-1 flex justify-between font-mono text-[11.5px] text-faint">
+            <span className="num">{formatTime(new Date(t0).toISOString())}</span>
+            <span>now</span>
+          </div>
+          <Legend />
+        </section>
+      )}
 
-      <div className="reveal r3 rule mb-6" />
+      {waiting.length > 0 && <FixTeaser views={waiting} />}
 
-      <div className="reveal r4 mb-4 flex items-baseline justify-between">
-        <h2 className="m-0 font-serif text-[22px] font-normal tracking-[-0.01em]">Today&apos;s projects</h2>
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-dim">{ledgerLabel}</span>
-      </div>
-
-      <div className="reveal r5 flex flex-col">
-        {ledger.length === 0 && (
-          <p className="py-6 italic text-dim">
-            No sessions yet. Run Claude Code in any project and this page will fill in.
-          </p>
-        )}
-        {ledger.map((row, i) => (
-          <ProjectRow
-            key={row.project_name}
-            name={row.project_name}
-            cwd={row.cwd}
-            sessionCount={row.session_count}
-            messageCount={row.message_count}
-            aiTitle={row.ai_title}
-            openThread={row.open_thread}
-            lastTouched={row.last_touched}
-            spark={row.spark}
-            primary={i === 0}
-          />
-        ))}
-      </div>
-
-      <div className="reveal r6">
-        <AmbientChart values={fourteen} />
-      </div>
+      <section>
+        <SectionHead title={todays.length > 0 ? 'Sessions today' : 'Latest sessions'} note={todays.length > 0 ? undefined : 'Nothing today yet'} />
+        <div className="flex flex-col">
+          {recent.map((s) => (
+            <SessionRow key={s.id} session={s} corrections={correctionIds} when={todays.length > 0 ? 'time' : 'relative'} />
+          ))}
+          {recent.length === 0 && (
+            <p className="py-6 text-muted">No sessions yet. Trace reads ~/.claude/projects and ~/.codex/sessions as you work.</p>
+          )}
+        </div>
+      </section>
     </>
+  );
+}
+
+function Legend() {
+  return (
+    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[12.5px] text-muted">
+      <span className="flex items-center gap-2">
+        <svg width="8" height="14" aria-hidden><line x1="4" x2="4" y1="13" y2="2" stroke="var(--ink)" strokeWidth="1.6" strokeLinecap="round" /></svg>
+        A prompt, as tall as it was long
+      </span>
+      <span className="flex items-center gap-2">
+        <svg width="12" height="16" aria-hidden>
+          <line x1="6" x2="6" y1="9" y2="1" stroke="var(--mark)" strokeWidth="2" strokeLinecap="round" />
+          <path d="M2,16 L6,11 L10,16" fill="none" stroke="var(--mark)" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+        A correction
+      </span>
+      <span className="flex items-center gap-2">
+        <svg width="14" height="8" aria-hidden>
+          {[2, 5, 7, 11].map((x) => <line key={x} x1={x} x2={x} y1="1" y2="7" stroke="var(--faint)" strokeWidth="1" />)}
+        </svg>
+        The agent at work
+      </span>
+    </div>
   );
 }
